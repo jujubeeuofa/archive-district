@@ -1,27 +1,46 @@
-# Archive District — Designer Resale CRM (Prototype)
+# Archive District — Designer Resale CRM
 
-A working full-stack MVP for a designer-resale business (Chrome Hearts-heavy
-streetwear/accessories) run by a father-son team. It covers the storefront,
-checkout, a "sell to us" client intake flow, and an admin back office for
-inventory, submissions, orders, reporting, and clients — including a real
-(installable) PWA shell and Web Push notifications.
+A working full-stack app for Archive District (Chrome Hearts-heavy
+streetwear/accessories resale, run by a father-son team). It covers the
+storefront, checkout, a "sell to us" client intake flow with an authenticity
+checklist, and an admin back office for inventory, submissions, orders,
+reporting, and clients — including a real (installable) PWA shell and Web
+Push notifications.
 
 Built with Next.js 14 (App Router) + TypeScript, Tailwind CSS, Prisma +
-SQLite, NextAuth (Credentials/JWT), Stripe, and `web-push`.
+PostgreSQL, NextAuth (Credentials/JWT), Stripe, and `web-push`.
 
-## Quickstart
+Styled to the locked Archive District brand: Ink/Bone/Hazard palette,
+Archivo Black + Archivo + IBM Plex Mono type (`tailwind.config.ts`,
+`src/app/globals.css`). Full spec — palette, marks, voice — lives in the
+`brand-identity` doc in the Resell Business project.
+
+## Local development
+
+You need a Postgres database to point `DATABASE_URL` at — two easy options:
+
+**Option A — Neon dev branch (recommended, zero local install):** create a
+free project at [neon.tech](https://neon.tech), copy its connection string
+into `.env` as `DATABASE_URL`. Create a second branch called `dev` in the
+Neon console (Branches → New branch) and use *that* branch's connection
+string locally, so local work never touches the same data as production.
+
+**Option B — local Postgres:** `createdb archive_district` (Postgres 14+),
+then set `DATABASE_URL="postgresql://<user>:<password>@localhost:5432/archive_district"`
+in `.env`.
+
+Either way:
 
 ```bash
 npm install
+cp .env.example .env        # then fill in DATABASE_URL, NEXTAUTH_SECRET
 npx prisma generate
-npx prisma db push       # creates prisma/dev.db from schema.prisma
-npm run seed              # seeds demo users, inventory, submissions, orders
-npm run dev                # http://localhost:3000
+npx prisma migrate dev      # applies prisma/migrations/ to your database
+npm run seed                 # seeds demo users, inventory, submissions, orders
+npm run dev                   # http://localhost:3000
 ```
 
-`.env` is already checked in with safe local defaults (SQLite path, a dev
-`NEXTAUTH_SECRET`, and every optional key left blank). Copy `.env.example`
-if you want to start from a clean template instead.
+Generate `NEXTAUTH_SECRET` with `openssl rand -base64 32`.
 
 ## Demo login credentials
 
@@ -69,9 +88,9 @@ click-through-able in the running app with the seed data.
 - **Reports** are grouped tables, not charts — the brief called a chart a
   "bonus if time allows"; tables were prioritized to keep the core feature
   set solid rather than partially working.
-- **Photo storage** is base64 data URIs inlined in SQLite (see below) —
-  intentional for a zero-infra prototype, called out below as the first
-  thing to swap for production.
+- **Photo storage** is base64 data URIs inlined in Postgres (see below) —
+  intentional to avoid needing object storage for a v1, called out below as
+  a likely first thing to swap once real inventory volume shows up.
 - **Admin role check** happens in two places for defense in depth:
   `src/middleware.ts` (redirects non-admins away from `/admin/*` at the
   edge) and `requireAdmin()` server-side in every admin page/action (in
@@ -83,7 +102,7 @@ See `.env.example` for the full list with inline comments. Summary:
 
 | Variable | Required? | If omitted |
 |---|---|---|
-| `DATABASE_URL` | Yes | App won't start — SQLite file path |
+| `DATABASE_URL` | Yes | App won't start — Postgres connection string (Neon in production) |
 | `NEXTAUTH_URL` | Yes | NextAuth callback base URL |
 | `NEXTAUTH_SECRET` | Yes | Session JWTs won't sign correctly |
 | `STRIPE_SECRET_KEY` | No | `/api/checkout` falls back to the **demo checkout** — order is marked PAID immediately, item marked SOLD, no Stripe call made |
@@ -138,11 +157,11 @@ throwing — nothing crashes.
 
 Photos are captured via `<input type="file">`, converted to base64 data
 URIs **client-side** (`src/components/PhotoUpload.tsx`), and stored as a
-plain `String` column (`Photo.dataUrl`) in SQLite. This means the entire
+plain `String` column (`Photo.dataUrl`) in Postgres. This means the entire
 app — inventory photos, sell-submission photos — works with zero external
-storage setup, which is the point for a local prototype.
+storage setup, which is fine to launch with.
 
-**For production**, swap this for real object storage:
+**Move to real object storage once photo volume grows:**
 
 1. Add an upload step (e.g. presigned S3 PUT, or a Cloudinary/Uploadthing
    SDK call) that returns a public URL instead of a data URI.
@@ -151,61 +170,64 @@ storage setup, which is the point for a local prototype.
 3. `Photo.dataUrl` can keep its name (or rename to `url`) — no other schema
    change needed, since it's already just a string.
 
-This matters because base64-in-SQLite doesn't scale: every photo roughly
-33% bloats the DB file, and SQLite isn't built for many concurrent writers
-in production.
+This matters because base64-in-Postgres doesn't scale forever: every photo
+roughly 33% bloats the row size, and Neon's free/starter tiers cap storage —
+fine for launch inventory, worth revisiting once you're photographing at
+volume.
 
-## Deploying
+## Deploying to Vercel + Neon
 
-### Vercel (recommended for this stack)
+The schema already targets Postgres and `prisma/migrations/` is checked in,
+so this is just wiring accounts together — no code changes needed.
 
-1. Push this repo to GitHub.
-2. Import into Vercel.
-3. **Swap SQLite for a hosted Postgres** (Vercel's filesystem is
-   ephemeral/read-only in production, so SQLite's file-based `dev.db`
-   won't persist). Use [Neon](https://neon.tech) or
-   [Supabase](https://supabase.com) — both have a free Postgres tier.
-
-   In `prisma/schema.prisma`, change:
-
-   ```prisma
-   datasource db {
-     provider = "sqlite"
-     url      = env("DATABASE_URL")
-   }
+1. **Push this repo to GitHub** (if it isn't already):
+   ```bash
+   git remote add origin <your-empty-github-repo-url>
+   git push -u origin master
    ```
-
-   to:
-
-   ```prisma
-   datasource db {
-     provider = "postgresql"
-     url      = env("DATABASE_URL")
-   }
-   ```
-
-   That's the **entire** schema change — no model edits needed. (Note: the
-   String-typed status/role fields in this schema were kept as `String`
-   rather than Prisma `enum` because SQLite doesn't support native enums.
-   On Postgres you *could* convert them back to real `enum` blocks for
-   stronger DB-level constraints, but it's optional — the TypeScript union
-   types in `src/lib/enums.ts` already give you type safety at the
-   application layer.)
-
-4. Set `DATABASE_URL` in Vercel's environment variables to your Neon/Supabase
-   connection string.
-5. Run `npx prisma db push` (or `migrate deploy`) against that URL once,
-   then `npx tsx prisma/seed.ts` if you want the same demo data.
-6. Set `NEXTAUTH_URL` to your production URL and generate a fresh
-   `NEXTAUTH_SECRET` (`openssl rand -base64 32`) — don't reuse the dev one.
-7. Add real `STRIPE_SECRET_KEY` / `STRIPE_PUBLISHABLE_KEY` and VAPID keys
-   if you want live payments and push in production.
+2. **Neon:** create a project at [neon.tech](https://neon.tech) (or reuse an
+   existing one). Note the connection string for its default branch — that's
+   production. Optionally create a `dev` branch too, for local work.
+3. **Vercel:** import the GitHub repo as a new project.
+   - In the Vercel dashboard, install the **Neon integration**
+     (Project → Integrations → Marketplace → Neon) and connect it to the
+     Neon project from step 2. This sets `DATABASE_URL` for you and, as a
+     bonus, gives every PR its own isolated Neon branch database
+     automatically for preview deployments.
+     Or skip the integration and just set `DATABASE_URL` manually under
+     Project Settings → Environment Variables.
+   - Set **Build Command** to `npm run vercel-build` (Project Settings →
+     Build & Development Settings → override). This runs
+     `prisma generate && prisma migrate deploy && next build` — migrations
+     apply automatically on every deploy, before the app builds.
+   - Set the rest of the environment variables (Production, and Preview if
+     you want previews to work too):
+     - `NEXTAUTH_URL` — your production URL (e.g. `https://archivedistrict.com`)
+     - `NEXTAUTH_SECRET` — a fresh one, `openssl rand -base64 32` — never
+       reuse the local dev value
+     - `STRIPE_SECRET_KEY` / `STRIPE_PUBLISHABLE_KEY` — once Stripe is ready;
+       leave blank and the app keeps working in demo-checkout mode
+     - `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` /
+       `NEXT_PUBLIC_VAPID_PUBLIC_KEY` — run `npm run vapid:generate` once and
+       paste the output in, if you want push notifications live
+4. **Deploy.** Vercel builds, runs migrations against Neon, and the site is
+   live on your `*.vercel.app` URL.
+5. **Seed (optional, first deploy only):** seed data is for demoing, not for
+   a real storefront — skip this once you're adding real inventory. If you
+   do want it: `DATABASE_URL=<neon connection string> npm run seed` from
+   your machine (or the Vercel CLI's `vercel env pull` to grab the URL
+   first).
+6. **Custom domain:** Project Settings → Domains → add
+   `archivedistrict.com` (or whatever you land on), point its DNS at Vercel
+   per the instructions Vercel shows, then update `NEXTAUTH_URL` to match
+   and redeploy.
 
 ### Any other Node host
 
-Same steps — the only SQLite-specific thing is the `DATABASE_URL` file path
-and the datasource `provider` line above. Everything else (NextAuth,
-Stripe, web-push, PWA assets) is host-agnostic.
+Same idea — set `DATABASE_URL` to your Postgres instance, run
+`npm run vercel-build` (or `prisma migrate deploy && next build`
+separately) as your build step, then `npm run start`. Nothing here is
+Vercel-specific except the "Build Command override" mechanism itself.
 
 ## Project structure
 
@@ -234,25 +256,37 @@ scripts/
 All of the following were run and passed before this was handed off:
 
 1. `npm install` — clean install, no fatal errors.
-2. `npx prisma generate` + `npx prisma db push` — schema applies to a fresh
-   `prisma/dev.db`.
-3. `npm run seed` — completes without error, creates 4 users, 20 inventory
-   items, 3 sell submissions, 3 orders.
-4. `npm run build` — production build compiles successfully, **zero
-   TypeScript errors**.
-5. `npm run dev` + curl checks — `/`, `/shop`, `/login`, `/register`,
-   `/manifest.json`, `/sw.js` return 200; `/admin` and `/sell` correctly
-   redirect (307) when signed out; after signing in via the real NextAuth
-   credentials flow, `/admin/*` returns 200 for the admin user and redirects
-   a client user away; the full demo checkout flow was exercised end-to-end
-   (buy → order created PENDING → auto-marked PAID → item marked SOLD →
-   order detail page renders).
+2. Full authenticity-check flow exercised via a real headless browser
+   (Playwright): logged in as admin, filled out and saved a checklist,
+   confirmed the badge/reviewer attribution updated, then flagged an
+   in-stock item and confirmed it disappeared from the storefront grid and
+   its own detail page immediately.
+3. **Postgres migration path, verified against a real local Postgres 16
+   instance** (not just SQLite): `npx prisma migrate dev --name init`
+   generated `prisma/migrations/`, applied cleanly; `npm run seed` populated
+   4 users, 20 inventory items, 6 authenticity checks, 3 sell submissions,
+   3 orders with zero errors.
+4. `npm run vercel-build` (`prisma generate && prisma migrate deploy &&
+   next build`) run **exactly as Vercel will run it**, against a freshly
+   dropped-and-recreated Postgres database — migration applied, production
+   build compiled with zero TypeScript errors, all 23 routes generated.
+5. `npm run start` + curl checks against the Postgres-backed build — `/`,
+   `/shop`, `/login`, `/register`, `/manifest.json`, `/sw.js` return 200;
+   `/admin` and `/sell` correctly redirect (307) when signed out; after
+   signing in via the real NextAuth credentials flow, `/admin/*` returns
+   200 for the admin user and redirects a client user away; the full demo
+   checkout flow was exercised end-to-end (buy → order created PENDING →
+   auto-marked PAID → item marked SOLD → order detail page renders).
+6. Visual QA via Playwright screenshots of the rebranded UI (shop grid,
+   item detail, login) — caught and fixed a pre-existing layout bug where
+   secondary product photos weren't stretching to fill their thumbnail grid
+   cells (missing `w-full`).
 
 ## Known limitations (prototype scope)
 
-- No image optimization/resizing on upload — large photos will bloat the
-  SQLite file and slow page loads. Fine for a handful of demo items; revisit
-  before onboarding hundreds of real listings.
+- No image optimization/resizing on upload — large photos will bloat row
+  size and slow page loads. Fine at launch inventory volume; revisit before
+  onboarding hundreds of real listings (see "Photo uploads" above).
 - No pagination on inventory/orders/submissions tables — fine at prototype
   scale, would need it once inventory grows past ~200 items.
 - No email notifications (order confirmations, offer emails) — only in-app
