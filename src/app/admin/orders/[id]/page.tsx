@@ -91,6 +91,7 @@ export default async function AdminOrderDetailPage({ params }: { params: { id: s
               <form action={boundLogPayment} className="space-y-2">
                 <select className="input" name="tenderType" defaultValue="CASH">
                   <option value="CASH">Cash</option>
+                <option value="US_BANK">US Bank (terminal/app/gateway)</option>
                   <option value="OTHER">Other</option>
                 </select>
                 <button type="submit" className="btn-primary w-full">

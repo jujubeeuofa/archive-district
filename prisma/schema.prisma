@@ -157,7 +157,7 @@ model Order {
   status          String   @default("PENDING")
   subtotal        Float
   total           Float
-  /// TenderType: "CARD" | "CASH" | "OTHER"
+    /// TenderType: "CARD" | "CASH" | "US_BANK" | "OTHER"
   tenderType      String   @default("CARD")
   stripeSessionId String?
   /// Trade-in credit applied to this order at checkout (dollars). subtotal

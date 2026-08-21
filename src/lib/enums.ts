@@ -54,6 +54,11 @@ export type OrderStatus = (typeof OrderStatus)[keyof typeof OrderStatus];
 export const TenderType = {
   CARD: "CARD",
   CASH: "CASH",
+  /// A sale processed through the US Bank merchant account — physical card
+  /// terminal, iPhone app, or web API gateway all land here for now. Split
+  /// into per-channel values later if reporting ever needs to tell them
+  /// apart; today it's one processor relationship either way.
+  US_BANK: "US_BANK",
   OTHER: "OTHER",
 } as const;
 export type TenderType = (typeof TenderType)[keyof typeof TenderType];

@@ -27,7 +27,12 @@ export default async function AdminOrdersPage({
   return (
     <div>
       <AdminNav active="/admin/orders" />
-      <h1 className="text-2xl font-display uppercase text-bone">Orders</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-display uppercase text-bone">Orders</h1>
+        <Link href="/admin/orders/new" className="btn-primary">
+          Log walk-in sale
+        </Link>
+      </div>
 
       <div className="mt-4 flex flex-wrap gap-2">
         <Link
