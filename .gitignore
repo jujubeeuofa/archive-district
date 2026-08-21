@@ -1,0 +1,30 @@
+# dependencies
+/node_modules
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+
+# local env files — .env holds real secrets (DB password, NEXTAUTH_SECRET,
+# API keys), never commit it. .env.example is the only env file meant to be
+# tracked.
+.env
+.env*.local
+
+# database
+/prisma/dev.db
+/prisma/dev.db-journal
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts

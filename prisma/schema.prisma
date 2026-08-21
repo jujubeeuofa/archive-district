@@ -1,0 +1,171 @@
+// Prisma schema for Archive District.
+//
+// Runs on Postgres (Neon in production; any local/Docker Postgres for dev —
+// see README.md "Local development" for the exact setup). DATABASE_URL
+// points at whichever database you're targeting.
+//
+// NOTE ON ENUMS: fields that represent a fixed set of values (role, status,
+// etc.) are still stored as String, validated/typed against the TypeScript
+// union types in src/lib/enums.ts, rather than native Postgres enums. This
+// was originally a SQLite limitation (no enum support there); it's kept as
+// String now for simplicity — converting to real `enum` blocks is a safe,
+// optional follow-up, not required for production.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  /// Role: "ADMIN" | "CLIENT"
+  role         String   @default("CLIENT")
+  phone        String?
+  createdAt    DateTime @default(now())
+
+  submissions          SellSubmission[]
+  orders               Order[]
+  messages             Message[]
+  pushSubscriptions    PushSubscription[]
+  authenticityChecksDone AuthenticityCheck[]
+}
+
+model Item {
+  id          String   @id @default(cuid())
+  title       String
+  brand       String
+  category    String
+  condition   String
+  description String
+  costPrice   Float
+  listPrice   Float
+  soldPrice   Float?
+  /// ItemStatus: "IN_STOCK" | "SOLD" | "HELD" | "PENDING_INTAKE"
+  status      String   @default("IN_STOCK")
+  /// AuthenticityStatus: "UNVERIFIED" | "AUTHENTICATED" | "FLAGGED"
+  authenticityStatus String @default("UNVERIFIED")
+  /// ItemSource: "PURCHASED" | "CONSIGNED"
+  source      String   @default("PURCHASED")
+  createdAt   DateTime @default(now())
+
+  photos     Photo[]
+  orderItems OrderItem[]
+  authenticityCheck AuthenticityCheck?
+}
+
+model Photo {
+  id        String   @id @default(cuid())
+  dataUrl   String
+  createdAt DateTime @default(now())
+
+  itemId String?
+  item   Item?   @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  sellSubmissionId String?
+  sellSubmission   SellSubmission? @relation(fields: [sellSubmissionId], references: [id], onDelete: Cascade)
+}
+
+model SellSubmission {
+  id          String   @id @default(cuid())
+  clientId    String
+  client      User     @relation(fields: [clientId], references: [id])
+  brand       String
+  category    String
+  title       String
+  description String
+  askingPrice Float?
+  /// SubmissionStatus: "SUBMITTED" | "IN_REVIEW" | "OFFER_MADE" | "ACCEPTED" | "DECLINED"
+  status      String   @default("SUBMITTED")
+  offerAmount Float?
+  /// AuthenticityStatus: "UNVERIFIED" | "AUTHENTICATED" | "FLAGGED"
+  authenticityStatus String @default("UNVERIFIED")
+  createdAt   DateTime @default(now())
+
+  photos   Photo[]
+  messages Message[]
+  authenticityCheck AuthenticityCheck?
+}
+
+/// The audit trail behind an item or submission's authenticityStatus.
+/// Belongs to exactly one of Item / SellSubmission (never both, never neither
+/// once saved). `checklist` is a JSON-encoded array of
+/// { id, label, checked, note } built from the brand checklist template in
+/// src/lib/authenticity.ts at the time of review, so past reviews stay
+/// legible even if the template changes later.
+model AuthenticityCheck {
+  id     String @id @default(cuid())
+  brand  String
+  /// JSON: Array<{ id: string; label: string; checked: boolean; note?: string }>
+  checklist String
+  /// AuthenticityStatus: "UNVERIFIED" | "AUTHENTICATED" | "FLAGGED"
+  decision  String @default("UNVERIFIED")
+  notes     String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  reviewedById String?
+  reviewedBy   User?    @relation(fields: [reviewedById], references: [id])
+
+  itemId String? @unique
+  item   Item?   @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  sellSubmissionId String? @unique
+  sellSubmission   SellSubmission? @relation(fields: [sellSubmissionId], references: [id], onDelete: Cascade)
+}
+
+model Order {
+  id              String   @id @default(cuid())
+  buyerId         String
+  buyer           User     @relation(fields: [buyerId], references: [id])
+  /// OrderStatus: "PENDING" | "PAID" | "CANCELED" | "REFUNDED"
+  status          String   @default("PENDING")
+  subtotal        Float
+  total           Float
+  /// TenderType: "CARD" | "CASH" | "OTHER"
+  tenderType      String   @default("CARD")
+  stripeSessionId String?
+  createdAt       DateTime @default(now())
+
+  items    OrderItem[]
+  messages Message[]
+}
+
+model OrderItem {
+  id          String @id @default(cuid())
+  orderId     String
+  order       Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  itemId      String
+  item        Item   @relation(fields: [itemId], references: [id])
+  priceAtSale Float
+}
+
+model Message {
+  id        String   @id @default(cuid())
+  senderId  String
+  sender    User     @relation(fields: [senderId], references: [id])
+  body      String
+  createdAt DateTime @default(now())
+
+  orderId String?
+  order   Order?  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  sellSubmissionId String?
+  sellSubmission   SellSubmission? @relation(fields: [sellSubmissionId], references: [id], onDelete: Cascade)
+}
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+}
