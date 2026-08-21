@@ -8,6 +8,13 @@ export const authOptions: AuthOptions = {
   session: {
     strategy: "jwt",
   },
+  // Always deployed on HTTPS (Vercel) — force the __Secure- cookie prefix
+  // explicitly rather than relying on NEXTAUTH_URL parsing to infer it.
+  // A mismatch here (Node route sets the plain cookie name while Edge
+  // middleware's getToken looks for the __Secure- prefixed one, or vice
+  // versa) silently breaks session checks in middleware even though
+  // /api/auth/session still works fine.
+  useSecureCookies: true,
   pages: {
     signIn: "/login",
   },
