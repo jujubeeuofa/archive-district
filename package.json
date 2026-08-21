@@ -13,11 +13,11 @@
     "prisma:push": "prisma db push",
     "migrate:dev": "prisma migrate dev",
     "migrate:deploy": "prisma migrate deploy",
-    "seed": "tsx prisma/seed.ts",
+    "seed": "SEED_CLI=1 tsx prisma/seed.ts",
     "vapid:generate": "node scripts/generate-vapid-keys.mjs"
   },
   "prisma": {
-    "seed": "tsx prisma/seed.ts"
+    "seed": "SEED_CLI=1 tsx prisma/seed.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.20.0",

@@ -16,7 +16,7 @@ const prisma = new PrismaClient();
 
 const DEMO_PASSWORD = "password123";
 
-async function main() {
+export async function main() {
   console.log("Seeding database...");
 
   // --- Users ---
@@ -582,11 +582,16 @@ async function main() {
   console.log(`Client login: client1@example.com / ${DEMO_PASSWORD}`);
 }
 
-main()
-  .catch((e) => {
-    console.error(e);
-    process.exit(1);
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+// Only auto-run when invoked as the CLI seed script (`npm run seed`), never
+// on a plain import — the temporary /api/internal/seed route imports
+// `main` directly and calls it itself under its own secret + try/catch.
+if (process.env.SEED_CLI === "1") {
+  main()
+    .catch((e) => {
+      console.error(e);
+      process.exit(1);
+    })
+    .finally(async () => {
+      await prisma.$disconnect();
+    });
+}
