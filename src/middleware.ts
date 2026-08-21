@@ -12,6 +12,10 @@ export default withAuth(
     return NextResponse.next();
   },
   {
+    // The Edge Middleware runtime doesn't reliably auto-pick-up
+    // NEXTAUTH_SECRET the way the Node.js API routes do — pass it
+    // explicitly so token verification here actually works in production.
+    secret: process.env.NEXTAUTH_SECRET,
     callbacks: {
       authorized: ({ token }) => !!token,
     },
