@@ -7,7 +7,7 @@ import AdminNav from "@/components/AdminNav";
 import AuthenticityChecklist from "@/components/AuthenticityChecklist";
 import { computeMargin, formatMoney, statusBadgeClass } from "@/lib/format";
 import { stockXSearchUrl, grailedSearchUrl } from "@/lib/priceComp";
-import { getChecklistTemplate } from "@/lib/authenticity";
+import { getChecklistTemplate, getReferenceGuides } from "@/lib/authenticity";
 import type { ChecklistEntry } from "@/lib/enums";
 
 export default async function AdminItemDetailPage({ params }: { params: { id: string } }) {
@@ -19,6 +19,8 @@ export default async function AdminItemDetailPage({ params }: { params: { id: st
   });
   if (!item) notFound();
 
+  const vendors = await prisma.vendor.findMany({ orderBy: { name: "asc" } });
+
   const { margin, marginPct } = computeMargin(item.costPrice, item.listPrice, item.soldPrice);
   const boundUpdate = updateItem.bind(null, item.id);
   const boundDelete = deleteItem.bind(null, item.id);
@@ -26,6 +28,7 @@ export default async function AdminItemDetailPage({ params }: { params: { id: st
   const stockxUrl = stockXSearchUrl(item.brand, item.title);
   const grailedUrl = grailedSearchUrl(item.brand, item.title);
   const checklistTemplate = getChecklistTemplate(item.brand);
+  const referenceGuides = getReferenceGuides(item.brand);
   const existingCheck = item.authenticityCheck
     ? {
         checklist: JSON.parse(item.authenticityCheck.checklist) as ChecklistEntry[],
@@ -156,6 +159,18 @@ export default async function AdminItemDetailPage({ params }: { params: { id: st
             </div>
 
             <div>
+              <label className="label" htmlFor="vendorId">Vendor</label>
+              <select className="input" id="vendorId" name="vendorId" defaultValue={item.vendorId ?? ""}>
+                <option value="">No vendor on record</option>
+                {vendors.map((v) => (
+                  <option key={v.id} value={v.id}>
+                    {v.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
               <label className="label">Add photos</label>
               <PhotoUpload name="newPhotos" maxPhotos={8} />
             </div>
@@ -227,6 +242,7 @@ export default async function AdminItemDetailPage({ params }: { params: { id: st
             template={checklistTemplate}
             existing={existingCheck}
             action={boundAuthCheck}
+            referenceGuides={referenceGuides}
           />
         </div>
       </div>

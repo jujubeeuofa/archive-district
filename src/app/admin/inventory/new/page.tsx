@@ -1,10 +1,13 @@
 import { requireAdmin } from "@/lib/session";
+import { prisma } from "@/lib/prisma";
 import { createItem } from "../actions";
 import PhotoUpload from "@/components/PhotoUpload";
 import AdminNav from "@/components/AdminNav";
 
 export default async function NewItemPage() {
   await requireAdmin();
+
+  const vendors = await prisma.vendor.findMany({ orderBy: { name: "asc" } });
 
   return (
     <div>
@@ -67,6 +70,18 @@ export default async function NewItemPage() {
               <option value="CONSIGNED">Consigned</option>
             </select>
           </div>
+        </div>
+
+        <div>
+          <label className="label" htmlFor="vendorId">Vendor</label>
+          <select className="input" id="vendorId" name="vendorId" defaultValue="">
+            <option value="">No vendor on record</option>
+            {vendors.map((v) => (
+              <option key={v.id} value={v.id}>
+                {v.name}
+              </option>
+            ))}
+          </select>
         </div>
 
         <p className="text-xs text-ink-500">

@@ -55,6 +55,34 @@ const BRAND_CHECKLISTS: Record<string, ChecklistItemTemplate[]> = {
   ],
 };
 
+export type ReferenceGuide = {
+  label: string;
+  url: string;
+};
+
+/**
+ * External real-vs-fake reference guides to link from the authenticity
+ * checklist, curated by Jeremy — not scraped or auto-generated. Add more
+ * here as reference material turns up for other brands; the checklist UI
+ * just renders whatever's in this list for the item's brand.
+ */
+const REFERENCE_GUIDES: Record<string, ReferenceGuide[]> = {
+  "chrome hearts": [
+    { label: "Legit Check By Ch — full Chrome Hearts guide archive", url: "https://legitcheck.app/category/guides/chrome-hearts/" },
+    { label: "Legit Check — jeans", url: "https://legitcheck.app/guides/chrome-hearts/fake-vs-real-chrome-hearts-jeans/" },
+    { label: "Legit Check — tees", url: "https://legitcheck.app/guides/chrome-hearts/real-vs-fake-chrome-hearts-tee/" },
+    { label: "Legit Check — rings (Forever 2003)", url: "https://legitcheck.app/guides/chrome-hearts/fake-vs-real-chrome-hearts-forever-2003-ring/" },
+    { label: "LegitGrails — Chrome Hearts section", url: "https://legitgrails.com/products/chrome-hearts-legit-check" },
+    { label: "Legitique — cap guide (barcode tags, hardware, label fonts)", url: "https://legitique.com/blogs/chrome-hearts/chrome-hearts-cap-legit-check" },
+    { label: "AVNTGRDNY — jewelry guide", url: "https://avntgrdny.com/blogs/chrome-hearts-jewelry-guide/" },
+  ],
+};
+
+/** Reference guide links for a brand, if any have been curated — empty array otherwise. */
+export function getReferenceGuides(brand: string): ReferenceGuide[] {
+  return REFERENCE_GUIDES[brand.trim().toLowerCase()] ?? [];
+}
+
 /** Builds the checklist template for a given brand: generic items first, then brand-specific ones (if we have any). */
 export function getChecklistTemplate(brand: string): ChecklistItemTemplate[] {
   const key = brand.trim().toLowerCase();

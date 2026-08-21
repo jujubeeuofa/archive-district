@@ -12,6 +12,11 @@ function num(formData: FormData, key: string): number {
   return Number.isFinite(v) ? v : 0;
 }
 
+function vendorId(formData: FormData): string | null {
+  const v = String(formData.get("vendorId") || "").trim();
+  return v || null;
+}
+
 export async function createItem(formData: FormData) {
   await requireAdmin();
 
@@ -30,6 +35,7 @@ export async function createItem(formData: FormData) {
       // authenticityStatus defaults to UNVERIFIED (schema default) — set
       // via the checklist on the item's edit page after creation.
       source: (String(formData.get("source") || ItemSource.PURCHASED) as ItemSource),
+      vendorId: vendorId(formData),
       photos: { create: photoUrls.map((dataUrl) => ({ dataUrl })) },
     },
   });
@@ -58,6 +64,7 @@ export async function updateItem(itemId: string, formData: FormData) {
       // saveItemAuthenticityCheck below, driven by the checklist review,
       // not by a free-standing dropdown on the general edit form.
       source: String(formData.get("source") || ItemSource.PURCHASED) as ItemSource,
+      vendorId: vendorId(formData),
     },
   });
 

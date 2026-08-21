@@ -56,6 +56,56 @@ export async function main() {
     clients.push(user);
   }
 
+  // --- Vendors (suppliers we buy/consign inventory from) ---
+  const vendorData = [
+    {
+      name: "Midwest Streetwear Buyers",
+      contactName: "Tony Russo",
+      email: "tony@mwstreetwearbuyers.example",
+      phone: "555-020-0001",
+      notes: "Regular consignor — mostly Chrome Hearts and Supreme out of Chicago.",
+    },
+    {
+      name: "Estate Silver & Jewelry Co.",
+      contactName: "Denise Falk",
+      email: "denise@estatesilverco.example",
+      phone: "555-020-0002",
+      notes: "Buys estate sterling jewelry lots — good source for CH rings and pendants.",
+    },
+    {
+      name: "Grail Pickups LLC",
+      contactName: "Omar Haddad",
+      email: "omar@grailpickups.example",
+      phone: "555-020-0003",
+      notes: "Sources sneakers and outerwear from regional consignment shops.",
+    },
+  ];
+
+  const vendors = [];
+  for (const v of vendorData) {
+    const existing = await prisma.vendor.findFirst({ where: { name: v.name } });
+    vendors.push(existing ?? (await prisma.vendor.create({ data: v })));
+  }
+  const [midwestVendor, estateVendor, grailVendor] = vendors;
+
+  console.log(`Created/found ${vendors.length} vendors.`);
+
+  // Which items came from which vendor — not every item needs one on record
+  // (plenty of real inventory is walk-in or unknown provenance), so this is
+  // intentionally partial.
+  const vendorByItemTitle: Record<string, string> = {
+    "Classic Cross Ring, Silver, Size 10": estateVendor.id,
+    "Floral Cross Pendant Necklace": estateVendor.id,
+    "CH Cross Stud Earrings (Pair)": estateVendor.id,
+    "Dagger Cross Ring, Size 9.5": midwestVendor.id,
+    "CH Cross Patch Hoodie, Black, L": midwestVendor.id,
+    "CH Cemetery Cross Tee, White, M": midwestVendor.id,
+    "Supreme Box Logo Hoodie, Red, L (FW22)": midwestVendor.id,
+    "Rick Owens DRKSHDW Ramones High-Top, 43": grailVendor.id,
+    "Rick Owens Cropped Wool Jacket, Black, 48": grailVendor.id,
+    "Supreme x The North Face Backpack, Black": grailVendor.id,
+  };
+
   // --- Inventory items (heavy Chrome Hearts focus) ---
   type SeedItem = {
     title: string;
@@ -333,6 +383,7 @@ export async function main() {
         status: it.status,
         authenticityStatus: it.authenticityStatus,
         source: it.source,
+        vendorId: vendorByItemTitle[it.title] ?? null,
         photos: {
           create: [
             { dataUrl: solidColorDataUrl(colorForIndex(i)) },

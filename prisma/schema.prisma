@@ -55,9 +55,27 @@ model Item {
   source      String   @default("PURCHASED")
   createdAt   DateTime @default(now())
 
+  vendorId String?
+  vendor   Vendor? @relation(fields: [vendorId], references: [id], onDelete: SetNull)
+
   photos     Photo[]
   orderItems OrderItem[]
   authenticityCheck AuthenticityCheck?
+}
+
+/// A supplier Archive District buys/consigns inventory from. Purely a
+/// directory + spend-tracking record — not a user account, no login.
+model Vendor {
+  id          String   @id @default(cuid())
+  name        String
+  contactName String?
+  email       String?
+  phone       String?
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  items Item[]
 }
 
 model Photo {

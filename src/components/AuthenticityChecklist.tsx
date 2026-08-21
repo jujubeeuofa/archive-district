@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { formatDate } from "@/lib/format";
-import type { ChecklistItemTemplate } from "@/lib/authenticity";
+import type { ChecklistItemTemplate, ReferenceGuide } from "@/lib/authenticity";
 
 type ExistingCheck = {
   checklist: { id: string; label: string; checked: boolean; note?: string }[];
@@ -17,6 +17,7 @@ type AuthenticityChecklistProps = {
   template: ChecklistItemTemplate[];
   existing: ExistingCheck | null;
   action: (formData: FormData) => void;
+  referenceGuides?: ReferenceGuide[];
 };
 
 const DECISION_COPY: Record<string, { label: string; className: string }> = {
@@ -32,7 +33,13 @@ const DECISION_COPY: Record<string, { label: string; className: string }> = {
  * any existing saved check, and a server action already bound to the
  * item/submission id (see saveItemAuthenticityCheck / saveSubmissionAuthenticityCheck).
  */
-export default function AuthenticityChecklist({ brand, template, existing, action }: AuthenticityChecklistProps) {
+export default function AuthenticityChecklist({
+  brand,
+  template,
+  existing,
+  action,
+  referenceGuides = [],
+}: AuthenticityChecklistProps) {
   const initialChecked = useMemo(() => {
     const map: Record<string, boolean> = {};
     for (const t of template) {
@@ -66,6 +73,30 @@ export default function AuthenticityChecklist({ brand, template, existing, actio
         Refine with your own judgment, and route anything genuinely uncertain to a professional
         authenticator before listing.
       </p>
+
+      {referenceGuides.length > 0 && (
+        <div className="mt-3 rounded-lg border border-ink-700 bg-ink-900 p-3">
+          <p className="label mb-2">Reference guides</p>
+          <ul className="space-y-1.5">
+            {referenceGuides.map((g) => (
+              <li key={g.url}>
+                <a
+                  href={g.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-accent hover:text-accent-light hover:underline"
+                >
+                  {g.label} ↗
+                </a>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-2 text-[11px] text-ink-500">
+            External real-vs-fake guides — for reference while reviewing, not official brand
+            documentation.
+          </p>
+        </div>
+      )}
 
       <form action={action} className="mt-4 space-y-3">
         <div className="space-y-2">

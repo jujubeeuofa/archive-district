@@ -11,7 +11,7 @@ import AdminNav from "@/components/AdminNav";
 import MessageThread from "@/components/MessageThread";
 import AuthenticityChecklist from "@/components/AuthenticityChecklist";
 import { formatMoney, formatDate, statusBadgeClass } from "@/lib/format";
-import { getChecklistTemplate } from "@/lib/authenticity";
+import { getChecklistTemplate, getReferenceGuides } from "@/lib/authenticity";
 import type { ChecklistEntry } from "@/lib/enums";
 
 export default async function AdminSubmissionDetailPage({ params }: { params: { id: string } }) {
@@ -33,6 +33,7 @@ export default async function AdminSubmissionDetailPage({ params }: { params: { 
   const boundConvert = convertToInventory.bind(null, submission.id);
   const boundAuthCheck = saveSubmissionAuthenticityCheck.bind(null, submission.id);
   const checklistTemplate = getChecklistTemplate(submission.brand);
+  const referenceGuides = getReferenceGuides(submission.brand);
   const existingCheck = submission.authenticityCheck
     ? {
         checklist: JSON.parse(submission.authenticityCheck.checklist) as ChecklistEntry[],
@@ -157,6 +158,7 @@ export default async function AdminSubmissionDetailPage({ params }: { params: { 
             template={checklistTemplate}
             existing={existingCheck}
             action={boundAuthCheck}
+            referenceGuides={referenceGuides}
           />
         </div>
       </div>
