@@ -3,11 +3,12 @@ import { requireUser } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { formatMoney, formatDate, statusBadgeClass } from "@/lib/format";
 import PushSubscribeButton from "@/components/PushSubscribeButton";
+import { getCreditBalance } from "@/lib/credit";
 
 export default async function AccountPage() {
   const user = await requireUser();
 
-  const [profile, orders, submissions] = await Promise.all([
+  const [profile, orders, submissions, creditBalance, creditTransactions] = await Promise.all([
     prisma.user.findUnique({ where: { id: user.id } }),
     prisma.order.findMany({
       where: { buyerId: user.id },
@@ -17,6 +18,12 @@ export default async function AccountPage() {
     prisma.sellSubmission.findMany({
       where: { clientId: user.id },
       orderBy: { createdAt: "desc" },
+    }),
+    getCreditBalance(user.id),
+    prisma.creditTransaction.findMany({
+      where: { userId: user.id },
+      orderBy: { createdAt: "desc" },
+      take: 10,
     }),
   ]);
 
@@ -43,6 +50,34 @@ export default async function AccountPage() {
             <p className="label mb-2">Notifications</p>
             <PushSubscribeButton />
           </div>
+        </div>
+      </div>
+
+      <div>
+        <h2 className="text-lg font-semibold text-bone">Trade-in credit</h2>
+        <div className="card mt-4 p-5">
+          <p className="label">Available balance</p>
+          <p className="mt-1 text-2xl font-semibold text-emerald-400">{formatMoney(creditBalance)}</p>
+          <p className="mt-1 text-xs text-ink-500">
+            Apply it toward any purchase at checkout in the shop.
+          </p>
+
+          {creditTransactions.length > 0 && (
+            <div className="mt-4 divide-y divide-ink-800 border-t border-ink-700 pt-3">
+              {creditTransactions.map((t) => (
+                <div key={t.id} className="flex items-center justify-between py-2 text-sm">
+                  <div>
+                    <p className="text-bone">{t.reason}</p>
+                    <p className="text-xs text-ink-500">{formatDate(t.createdAt)}</p>
+                  </div>
+                  <span className={t.amount >= 0 ? "text-emerald-400" : "text-red-400"}>
+                    {t.amount >= 0 ? "+" : ""}
+                    {formatMoney(t.amount)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 

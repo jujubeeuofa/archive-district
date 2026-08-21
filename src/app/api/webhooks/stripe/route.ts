@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { ItemStatus, OrderStatus } from "@/lib/enums";
+import { OrderStatus } from "@/lib/enums";
 import { getStripe, stripeConfigured } from "@/lib/stripe";
+import { markOrderPaidAndFulfill } from "@/lib/orderFulfillment";
 import type Stripe from "stripe";
 
 /**
@@ -33,18 +34,11 @@ export async function POST(req: NextRequest) {
   if (event.type === "checkout.session.completed") {
     const session = event.data.object as Stripe.Checkout.Session;
     const orderId = session.metadata?.orderId;
-    const itemId = session.metadata?.itemId;
 
     if (orderId) {
       const order = await prisma.order.findUnique({ where: { id: orderId } });
       if (order && order.status !== OrderStatus.PAID) {
-        await prisma.order.update({ where: { id: orderId }, data: { status: OrderStatus.PAID } });
-        if (itemId) {
-          await prisma.item.update({
-            where: { id: itemId },
-            data: { status: ItemStatus.SOLD, soldPrice: order.total },
-          });
-        }
+        await markOrderPaidAndFulfill(orderId);
       }
     }
   }

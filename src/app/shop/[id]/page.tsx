@@ -3,6 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { formatMoney } from "@/lib/format";
 import BuyButton from "@/components/BuyButton";
 import { ItemStatus } from "@/lib/enums";
+import { getSession } from "@/lib/session";
+import { getCreditBalance } from "@/lib/credit";
 
 export default async function ShopItemPage({ params }: { params: { id: string } }) {
   const item = await prisma.item.findUnique({
@@ -11,6 +13,9 @@ export default async function ShopItemPage({ params }: { params: { id: string } 
   });
 
   if (!item) notFound();
+
+  const session = await getSession();
+  const creditBalance = session?.user ? await getCreditBalance(session.user.id) : null;
 
   const available = item.status === ItemStatus.IN_STOCK && item.authenticityStatus !== "FLAGGED";
 
@@ -53,7 +58,7 @@ export default async function ShopItemPage({ params }: { params: { id: string } 
 
         <div className="mt-6">
           {available ? (
-            <BuyButton itemId={item.id} />
+            <BuyButton itemId={item.id} listPrice={item.listPrice} creditBalance={creditBalance} />
           ) : (
             <div className="rounded-lg border border-ink-700 bg-ink-900 px-4 py-3 text-center text-sm text-ink-400">
               {item.authenticityStatus === "FLAGGED"

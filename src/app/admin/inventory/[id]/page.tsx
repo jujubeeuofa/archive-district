@@ -1,13 +1,16 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireAdmin } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { updateItem, deleteItemPhoto, deleteItem, saveItemAuthenticityCheck } from "../actions";
+import { createConsignmentAgreement } from "../../consignments/actions";
 import PhotoUpload from "@/components/PhotoUpload";
 import AdminNav from "@/components/AdminNav";
 import AuthenticityChecklist from "@/components/AuthenticityChecklist";
 import { computeMargin, formatMoney, statusBadgeClass } from "@/lib/format";
 import { stockXSearchUrl, grailedSearchUrl } from "@/lib/priceComp";
 import { getChecklistTemplate, getReferenceGuides } from "@/lib/authenticity";
+import { buildDefaultConsignmentContract } from "@/lib/consignment";
 import type { ChecklistEntry } from "@/lib/enums";
 
 export default async function AdminItemDetailPage({ params }: { params: { id: string } }) {
@@ -15,11 +18,19 @@ export default async function AdminItemDetailPage({ params }: { params: { id: st
 
   const item = await prisma.item.findUnique({
     where: { id: params.id },
-    include: { photos: true, authenticityCheck: { include: { reviewedBy: true } } },
+    include: { photos: true, authenticityCheck: { include: { reviewedBy: true } }, consignmentAgreement: true },
   });
   if (!item) notFound();
 
   const vendors = await prisma.vendor.findMany({ orderBy: { name: "asc" } });
+  const boundCreateConsignment = createConsignmentAgreement.bind(null, item.id);
+  const defaultConsignmentContract = buildDefaultConsignmentContract({
+    consignorName: "",
+    itemTitle: item.title,
+    listPrice: item.listPrice,
+    floorPrice: null,
+    consignorSplitPct: 60,
+  });
 
   const { margin, marginPct } = computeMargin(item.costPrice, item.listPrice, item.soldPrice);
   const boundUpdate = updateItem.bind(null, item.id);
@@ -244,6 +255,108 @@ export default async function AdminItemDetailPage({ params }: { params: { id: st
             action={boundAuthCheck}
             referenceGuides={referenceGuides}
           />
+
+          <div className="card p-5">
+            <p className="label mb-2">Consignment</p>
+            {item.consignmentAgreement ? (
+              <div>
+                <div className="flex items-center justify-between">
+                  <span className={`badge ${statusBadgeClass(item.consignmentAgreement.status)}`}>
+                    {item.consignmentAgreement.status}
+                  </span>
+                  <span className="text-xs text-ink-400">
+                    {item.consignmentAgreement.consignorSplitPct}% to {item.consignmentAgreement.consignorName}
+                  </span>
+                </div>
+                {item.consignmentAgreement.payoutStatus === "OWED" && (
+                  <p className="mt-2 text-sm text-amber-300">
+                    Owed {formatMoney(item.consignmentAgreement.payoutAmount)}
+                  </p>
+                )}
+                {item.consignmentAgreement.payoutStatus === "PAID" && (
+                  <p className="mt-2 text-sm text-emerald-400">
+                    Paid {formatMoney(item.consignmentAgreement.payoutAmount)}
+                  </p>
+                )}
+                <Link
+                  href={`/admin/consignments/${item.consignmentAgreement.id}`}
+                  className="btn-secondary mt-3 block text-center"
+                >
+                  View agreement
+                </Link>
+              </div>
+            ) : (
+              <details>
+                <summary className="cursor-pointer text-sm text-accent hover:text-accent-light">
+                  Set up a consignment agreement
+                </summary>
+                <form action={boundCreateConsignment} className="mt-3 space-y-3">
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div>
+                      <label className="label" htmlFor="consignorName">Consignor name</label>
+                      <input className="input" id="consignorName" name="consignorName" required />
+                    </div>
+                    <div>
+                      <label className="label" htmlFor="consignorSplitPct">Consignor split (%)</label>
+                      <input
+                        className="input"
+                        id="consignorSplitPct"
+                        name="consignorSplitPct"
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="1"
+                        defaultValue={60}
+                        required
+                      />
+                    </div>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div>
+                      <label className="label" htmlFor="consignorEmail">Email</label>
+                      <input className="input" id="consignorEmail" name="consignorEmail" type="email" />
+                    </div>
+                    <div>
+                      <label className="label" htmlFor="consignorPhone">Phone</label>
+                      <input className="input" id="consignorPhone" name="consignorPhone" type="tel" />
+                    </div>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div>
+                      <label className="label" htmlFor="listPrice">List price ($)</label>
+                      <input
+                        className="input"
+                        id="listPrice"
+                        name="listPrice"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        defaultValue={item.listPrice}
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="label" htmlFor="floorPrice">Floor price ($, optional)</label>
+                      <input className="input" id="floorPrice" name="floorPrice" type="number" min="0" step="0.01" />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="label" htmlFor="contractTerms">Contract terms</label>
+                    <textarea
+                      className="input min-h-48 font-mono text-xs"
+                      id="contractTerms"
+                      name="contractTerms"
+                      defaultValue={defaultConsignmentContract}
+                      required
+                    />
+                  </div>
+                  <button type="submit" className="btn-primary w-full">
+                    Create agreement
+                  </button>
+                </form>
+              </details>
+            )}
+          </div>
         </div>
       </div>
     </div>

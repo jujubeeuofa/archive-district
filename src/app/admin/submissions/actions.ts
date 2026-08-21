@@ -4,7 +4,14 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/session";
-import { AuthenticityStatus, ItemSource, ItemStatus, SubmissionStatus } from "@/lib/enums";
+import {
+  AuthenticityStatus,
+  ItemSource,
+  ItemStatus,
+  SubmissionStatus,
+  SubmissionPayoutType,
+  CreditTransactionType,
+} from "@/lib/enums";
 import { parseChecklistFromFormData } from "@/lib/authenticity";
 
 export async function updateSubmissionStatus(submissionId: string, formData: FormData) {
@@ -19,10 +26,11 @@ export async function makeOffer(submissionId: string, formData: FormData) {
   await requireAdmin();
   const offerAmount = Number(formData.get("offerAmount"));
   if (!Number.isFinite(offerAmount) || offerAmount <= 0) return;
+  const payoutType = String(formData.get("payoutType") || SubmissionPayoutType.CASH) as SubmissionPayoutType;
 
   await prisma.sellSubmission.update({
     where: { id: submissionId },
-    data: { offerAmount, status: SubmissionStatus.OFFER_MADE },
+    data: { offerAmount, payoutType, status: SubmissionStatus.OFFER_MADE },
   });
   revalidatePath(`/admin/submissions/${submissionId}`);
   revalidatePath("/admin/submissions");
@@ -78,7 +86,7 @@ export async function saveSubmissionAuthenticityCheck(submissionId: string, form
  * Unverified.
  */
 export async function convertToInventory(submissionId: string) {
-  await requireAdmin();
+  const admin = await requireAdmin();
 
   const submission = await prisma.sellSubmission.findUnique({
     where: { id: submissionId },
@@ -122,7 +130,29 @@ export async function convertToInventory(submissionId: string) {
     data: { status: SubmissionStatus.ACCEPTED },
   });
 
+  // Issue trade-in credit if that's how this submission was paid out — guard
+  // against double-issuing if convertToInventory somehow runs twice for the
+  // same submission.
+  if (submission.payoutType === SubmissionPayoutType.STORE_CREDIT && submission.offerAmount) {
+    const alreadyIssued = await prisma.creditTransaction.findFirst({
+      where: { sellSubmissionId: submissionId, type: CreditTransactionType.EARNED },
+    });
+    if (!alreadyIssued) {
+      await prisma.creditTransaction.create({
+        data: {
+          userId: submission.clientId,
+          type: CreditTransactionType.EARNED,
+          amount: submission.offerAmount,
+          reason: `Trade-in credit for "${submission.title}"`,
+          sellSubmissionId: submissionId,
+          createdById: admin.id,
+        },
+      });
+    }
+  }
+
   revalidatePath("/admin/submissions");
   revalidatePath("/admin/inventory");
+  revalidatePath("/account");
   redirect(`/admin/inventory/${item.id}`);
 }

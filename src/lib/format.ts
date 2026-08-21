@@ -27,6 +27,7 @@ export function statusBadgeClass(status: string): string {
     case "PAID":
     case "ACCEPTED":
     case "AUTHENTICATED":
+    case "SIGNED":
       return "bg-emerald-900/40 text-emerald-300 border-emerald-700";
     case "SOLD":
       return "bg-accent/20 text-accent-light border-accent-dark";
@@ -38,11 +39,13 @@ export function statusBadgeClass(status: string): string {
       return "bg-amber-900/40 text-amber-300 border-amber-700";
     case "PENDING_INTAKE":
     case "OFFER_MADE":
+    case "SENT":
       return "bg-sky-900/40 text-sky-300 border-sky-700";
     case "DECLINED":
     case "CANCELED":
     case "REFUNDED":
     case "FLAGGED":
+    case "VOIDED":
       return "bg-red-900/40 text-red-300 border-red-700";
     default:
       return "bg-ink-700 text-ink-300 border-ink-600";

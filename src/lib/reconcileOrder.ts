@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
-import { ItemStatus, OrderStatus } from "@/lib/enums";
+import { OrderStatus } from "@/lib/enums";
 import { getStripe, stripeConfigured } from "@/lib/stripe";
+import { markOrderPaidAndFulfill } from "@/lib/orderFulfillment";
 
 /**
  * Best-effort reconciliation for orders paid via real Stripe Checkout.
@@ -12,10 +13,7 @@ import { getStripe, stripeConfigured } from "@/lib/stripe";
 export async function reconcileOrderWithStripe(orderId: string) {
   if (!stripeConfigured()) return;
 
-  const order = await prisma.order.findUnique({
-    where: { id: orderId },
-    include: { items: true },
-  });
+  const order = await prisma.order.findUnique({ where: { id: orderId } });
   if (!order) return;
   if (order.status !== OrderStatus.PENDING) return;
   if (!order.stripeSessionId || order.stripeSessionId.startsWith("demo_")) return;
@@ -25,13 +23,7 @@ export async function reconcileOrderWithStripe(orderId: string) {
     const checkoutSession = await stripe.checkout.sessions.retrieve(order.stripeSessionId);
 
     if (checkoutSession.payment_status === "paid") {
-      await prisma.order.update({ where: { id: order.id }, data: { status: OrderStatus.PAID } });
-      for (const oi of order.items) {
-        await prisma.item.update({
-          where: { id: oi.itemId },
-          data: { status: ItemStatus.SOLD, soldPrice: oi.priceAtSale },
-        });
-      }
+      await markOrderPaidAndFulfill(order.id);
     }
   } catch (err) {
     console.error("Failed to reconcile order with Stripe:", err);

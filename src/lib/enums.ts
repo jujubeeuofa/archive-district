@@ -57,3 +57,32 @@ export const TenderType = {
   OTHER: "OTHER",
 } as const;
 export type TenderType = (typeof TenderType)[keyof typeof TenderType];
+
+export const SubmissionPayoutType = {
+  CASH: "CASH",
+  STORE_CREDIT: "STORE_CREDIT",
+} as const;
+export type SubmissionPayoutType = (typeof SubmissionPayoutType)[keyof typeof SubmissionPayoutType];
+
+export const CreditTransactionType = {
+  EARNED: "EARNED",
+  REDEEMED: "REDEEMED",
+  ADJUSTED: "ADJUSTED",
+} as const;
+export type CreditTransactionType = (typeof CreditTransactionType)[keyof typeof CreditTransactionType];
+
+export const ConsignmentStatus = {
+  DRAFT: "DRAFT",
+  SENT: "SENT",
+  SIGNED: "SIGNED",
+  DECLINED: "DECLINED",
+  VOIDED: "VOIDED",
+} as const;
+export type ConsignmentStatus = (typeof ConsignmentStatus)[keyof typeof ConsignmentStatus];
+
+export const ConsignmentPayoutStatus = {
+  NOT_YET_SOLD: "NOT_YET_SOLD",
+  OWED: "OWED",
+  PAID: "PAID",
+} as const;
+export type ConsignmentPayoutStatus = (typeof ConsignmentPayoutStatus)[keyof typeof ConsignmentPayoutStatus];

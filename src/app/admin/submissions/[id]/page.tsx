@@ -112,19 +112,39 @@ export default async function AdminSubmissionDetailPage({ params }: { params: { 
 
           <div className="card p-5">
             <p className="label mb-2">Make / update offer</p>
-            <form action={boundOffer} className="flex gap-2">
-              <input
-                className="input"
-                type="number"
-                name="offerAmount"
-                min="0"
-                step="1"
-                defaultValue={submission.offerAmount ?? undefined}
-                placeholder="Offer amount"
-              />
-              <button type="submit" className="btn-secondary shrink-0">
-                Send
-              </button>
+            <form action={boundOffer} className="space-y-2">
+              <div className="flex gap-2">
+                <input
+                  className="input"
+                  type="number"
+                  name="offerAmount"
+                  min="0"
+                  step="1"
+                  defaultValue={submission.offerAmount ?? undefined}
+                  placeholder="Offer amount"
+                />
+                <button type="submit" className="btn-secondary shrink-0">
+                  Send
+                </button>
+              </div>
+              <div>
+                <label className="label" htmlFor="payoutType">Payout type</label>
+                <select
+                  className="input"
+                  id="payoutType"
+                  name="payoutType"
+                  defaultValue={submission.payoutType}
+                >
+                  <option value="CASH">Cash</option>
+                  <option value="STORE_CREDIT">Store credit (trade-in)</option>
+                </select>
+              </div>
+              {submission.payoutType === "STORE_CREDIT" && (
+                <p className="text-xs text-ink-500">
+                  Store credit is issued to {submission.client.name}&apos;s account once this
+                  submission is accepted below.
+                </p>
+              )}
             </form>
           </div>
 

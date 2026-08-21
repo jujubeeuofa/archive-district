@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/session";
-import { ItemStatus, OrderStatus, TenderType } from "@/lib/enums";
+import { OrderStatus, TenderType } from "@/lib/enums";
+import { markOrderPaidAndFulfill } from "@/lib/orderFulfillment";
 
 /**
  * Log a manual CASH or OTHER payment against a PENDING order — no Stripe
@@ -14,20 +15,11 @@ export async function logManualPayment(orderId: string, formData: FormData) {
 
   const tenderType = String(formData.get("tenderType") || TenderType.CASH) as TenderType;
 
-  const order = await prisma.order.findUnique({ where: { id: orderId }, include: { items: true } });
-  if (!order) return;
-
   await prisma.order.update({
     where: { id: orderId },
-    data: { status: OrderStatus.PAID, tenderType },
+    data: { tenderType },
   });
-
-  for (const oi of order.items) {
-    await prisma.item.update({
-      where: { id: oi.itemId },
-      data: { status: ItemStatus.SOLD, soldPrice: oi.priceAtSale },
-    });
-  }
+  await markOrderPaidAndFulfill(orderId);
 
   revalidatePath(`/admin/orders/${orderId}`);
   revalidatePath("/admin/orders");

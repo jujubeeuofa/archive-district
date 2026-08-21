@@ -9,8 +9,12 @@ import {
   SubmissionStatus,
   OrderStatus,
   TenderType,
+  CreditTransactionType,
+  ConsignmentStatus,
+  ConsignmentPayoutStatus,
 } from "../src/lib/enums";
 import { getChecklistTemplate } from "../src/lib/authenticity";
+import { generateSignToken, computeConsignorPayout, buildDefaultConsignmentContract } from "../src/lib/consignment";
 
 const prisma = new PrismaClient();
 
@@ -628,6 +632,73 @@ export async function main() {
   });
 
   console.log(`Created 3 sell submissions and 3 orders (${order1.id}, ${order2.id}, ${order3.id}).`);
+
+  // --- Trade-in credit demo ---
+  await prisma.creditTransaction.create({
+    data: {
+      userId: clients[0].id,
+      type: CreditTransactionType.EARNED,
+      amount: 150,
+      reason: "Trade-in credit for an old Chrome Hearts ring (paid as store credit, not cash)",
+      createdById: admin.id,
+    },
+  });
+  console.log(`Gave ${clients[0].name} $150 in trade-in credit.`);
+
+  // --- Consignment demo ---
+  const soldWallet = itemByTitle("CH Cross Zip Wallet, Brown Leather");
+  const signedConsignmentContract = buildDefaultConsignmentContract({
+    consignorName: "Elena Cho",
+    itemTitle: soldWallet.title,
+    listPrice: soldWallet.listPrice,
+    floorPrice: 700,
+    consignorSplitPct: 60,
+  });
+  await prisma.consignmentAgreement.create({
+    data: {
+      itemId: soldWallet.id,
+      consignorName: "Elena Cho",
+      consignorEmail: "elena.cho@example.com",
+      consignorPhone: "555-030-0001",
+      consignorSplitPct: 60,
+      listPrice: soldWallet.listPrice,
+      floorPrice: 700,
+      contractTerms: signedConsignmentContract,
+      contractSnapshot: signedConsignmentContract,
+      status: ConsignmentStatus.SIGNED,
+      signToken: generateSignToken(),
+      signerName: "Elena Cho",
+      signedAt: new Date(),
+      signerIp: "203.0.113.42",
+      payoutStatus: ConsignmentPayoutStatus.PAID,
+      payoutAmount: computeConsignorPayout(soldWallet.soldPrice ?? soldWallet.listPrice, 60),
+      paidAt: new Date(),
+      paidNote: "Paid via Venmo",
+    },
+  });
+
+  const sunglasses = itemByTitle("CH Cyrus Sunglasses, Matte Black");
+  await prisma.consignmentAgreement.create({
+    data: {
+      itemId: sunglasses.id,
+      consignorName: "Jordan Blake",
+      consignorEmail: "jordan.blake@example.com",
+      consignorPhone: "555-030-0002",
+      consignorSplitPct: 65,
+      listPrice: sunglasses.listPrice,
+      contractTerms: buildDefaultConsignmentContract({
+        consignorName: "Jordan Blake",
+        itemTitle: sunglasses.title,
+        listPrice: sunglasses.listPrice,
+        floorPrice: null,
+        consignorSplitPct: 65,
+      }),
+      status: ConsignmentStatus.DRAFT,
+      signToken: generateSignToken(),
+    },
+  });
+  console.log("Created 2 consignment agreements (1 signed & paid, 1 draft awaiting signature).");
+
   console.log("\nSeed complete.");
   console.log(`Admin login:  admin@example.com / ${DEMO_PASSWORD}`);
   console.log(`Client login: client1@example.com / ${DEMO_PASSWORD}`);

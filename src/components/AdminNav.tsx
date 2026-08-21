@@ -8,6 +8,7 @@ const tabs = [
   { href: "/admin/reports", label: "Reports" },
   { href: "/admin/clients", label: "Clients" },
   { href: "/admin/vendors", label: "Vendors" },
+  { href: "/admin/consignments", label: "Consignments" },
 ];
 
 export default function AdminNav({ active }: { active: string }) {

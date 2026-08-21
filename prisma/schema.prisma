@@ -35,6 +35,9 @@ model User {
   messages             Message[]
   pushSubscriptions    PushSubscription[]
   authenticityChecksDone AuthenticityCheck[]
+
+  creditTransactions        CreditTransaction[] @relation("CreditTransactionsForUser")
+  creditTransactionsCreated CreditTransaction[] @relation("CreditTransactionsCreatedBy")
 }
 
 model Item {
@@ -61,6 +64,7 @@ model Item {
   photos     Photo[]
   orderItems OrderItem[]
   authenticityCheck AuthenticityCheck?
+  consignmentAgreement ConsignmentAgreement?
 }
 
 /// A supplier Archive District buys/consigns inventory from. Purely a
@@ -102,6 +106,11 @@ model SellSubmission {
   /// SubmissionStatus: "SUBMITTED" | "IN_REVIEW" | "OFFER_MADE" | "ACCEPTED" | "DECLINED"
   status      String   @default("SUBMITTED")
   offerAmount Float?
+  /// SubmissionPayoutType: "CASH" | "STORE_CREDIT" — chosen alongside the
+  /// offer. Cash is just tracked here (paid out however the shop normally
+  /// pays clients); Store credit issues a CreditTransaction when the
+  /// submission is accepted (see convertToInventory).
+  payoutType  String   @default("CASH")
   /// AuthenticityStatus: "UNVERIFIED" | "AUTHENTICATED" | "FLAGGED"
   authenticityStatus String @default("UNVERIFIED")
   createdAt   DateTime @default(now())
@@ -109,6 +118,7 @@ model SellSubmission {
   photos   Photo[]
   messages Message[]
   authenticityCheck AuthenticityCheck?
+  creditTransactions CreditTransaction[]
 }
 
 /// The audit trail behind an item or submission's authenticityStatus.
@@ -149,10 +159,98 @@ model Order {
   /// TenderType: "CARD" | "CASH" | "OTHER"
   tenderType      String   @default("CARD")
   stripeSessionId String?
+  /// Trade-in credit applied to this order at checkout (dollars). subtotal
+  /// minus creditApplied is what was actually charged (total). 0 if none
+  /// was applied.
+  creditApplied   Float    @default(0)
   createdAt       DateTime @default(now())
 
   items    OrderItem[]
   messages Message[]
+  creditTransactions CreditTransaction[]
+}
+
+/// The ledger behind a customer's trade-in credit balance. The balance
+/// itself is never stored — it's always computed as the sum of a user's
+/// transactions (see getCreditBalance in src/lib/credit.ts), the same
+/// "compute, don't store" approach AuthenticityCheck/computeMargin use
+/// elsewhere in this schema.
+model CreditTransaction {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation("CreditTransactionsForUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  /// CreditTransactionType: "EARNED" | "REDEEMED" | "ADJUSTED"
+  type   String
+  /// Dollars. Positive adds to the balance (earned from a trade-in, or a
+  /// positive manual adjustment); negative subtracts (redeemed at
+  /// checkout, or a negative manual adjustment/correction).
+  amount Float
+  reason String
+
+  createdById String?
+  createdBy   User?   @relation("CreditTransactionsCreatedBy", fields: [createdById], references: [id])
+
+  sellSubmissionId String?
+  sellSubmission   SellSubmission? @relation(fields: [sellSubmissionId], references: [id], onDelete: SetNull)
+
+  orderId String?
+  order   Order?  @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+}
+
+/// A per-item consignment contract: pricing, the consignor's split of the
+/// eventual sale, and an in-house e-signature record. One agreement per
+/// item — a repeat consignor gets a fresh agreement (and fresh signature)
+/// for each new piece, since terms (split, floor price) can differ item to
+/// item. The consignor is captured as plain contact info here rather than
+/// a User relation — most consignors won't have (or need) a storefront
+/// login, same reasoning as the Vendor model.
+model ConsignmentAgreement {
+  id     String @id @default(cuid())
+  itemId String @unique
+  item   Item   @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  consignorName  String
+  consignorEmail String?
+  consignorPhone String?
+
+  /// Consignor's cut of the eventual sale price, as a percentage (0–100).
+  /// The shop keeps the remainder as its commission.
+  consignorSplitPct Float
+  listPrice         Float
+  /// Optional floor — the lowest price the consignor has agreed we can
+  /// sell for without checking back with them first.
+  floorPrice        Float?
+
+  /// The exact contract text presented to the consignor for signature.
+  /// Editable while DRAFT; once signed, contractSnapshot freezes what they
+  /// actually saw and agreed to, so later edits (e.g. tweaking the default
+  /// template for the NEXT agreement) never retroactively change a signed
+  /// record.
+  contractTerms    String
+  contractSnapshot String?
+
+  /// ConsignmentStatus: "DRAFT" | "SENT" | "SIGNED" | "DECLINED" | "VOIDED"
+  status String @default("DRAFT")
+
+  /// Long random token for the public, no-login e-sign link
+  /// (/consign/sign/[signToken]) — the consignor doesn't need an account.
+  signToken  String    @unique
+  signerName String?
+  signedAt   DateTime?
+  /// Best-effort requester IP captured at signing, for the audit trail.
+  signerIp   String?
+
+  /// ConsignmentPayoutStatus: "NOT_YET_SOLD" | "OWED" | "PAID"
+  payoutStatus String   @default("NOT_YET_SOLD")
+  payoutAmount Float?
+  paidAt       DateTime?
+  paidNote     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model OrderItem {
