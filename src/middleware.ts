@@ -1,32 +1,21 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getToken } from "next-auth/jwt";
 
-// TEMPORARY: bypassing withAuth entirely to get visibility into exactly
-// why getToken() returns null despite a present, correctly-named session
-// cookie. Will be reverted once the root cause is found.
+// Not using next-auth's withAuth() helper here: its automatic detection of
+// whether to look for the __Secure- prefixed session cookie unreliably
+// evaluated to false in Vercel's Edge Middleware runtime for this app,
+// which made every request to a protected route look logged-out even with
+// a valid session (confirmed via /api/auth/session working fine and the
+// correct cookie being present in the request). Passing secureCookie:
+// true explicitly — we're always on HTTPS via Vercel — fixes it.
 export default async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  let token = null;
-  let errorMessage: string | null = null;
-  try {
-    token = await getToken({
-      req,
-      secret: process.env.NEXTAUTH_SECRET,
-      secureCookie: true,
-    });
-  } catch (e) {
-    errorMessage = e instanceof Error ? `${e.name}: ${e.message}` : String(e);
-  }
-
-  console.log(
-    "[mw-debug2]",
-    "path=", pathname,
-    "hasToken=", !!token,
-    "error=", errorMessage,
-    "secretLen=", process.env.NEXTAUTH_SECRET?.length ?? 0,
-    "cookieNames=", req.cookies.getAll().map((c) => c.name).join(",")
-  );
+  const token = await getToken({
+    req,
+    secret: process.env.NEXTAUTH_SECRET,
+    secureCookie: true,
+  });
 
   if (!token) {
     const url = new URL("/login", req.url);
