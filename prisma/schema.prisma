@@ -28,6 +28,7 @@ model User {
   /// Role: "ADMIN" | "CLIENT"
   role         String   @default("CLIENT")
   phone        String?
+  notifyNewItems Boolean @default(false)
   createdAt    DateTime @default(now())
 
   submissions          SellSubmission[]

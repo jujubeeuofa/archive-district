@@ -3,7 +3,9 @@ import { requireUser } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { formatMoney, formatDate, statusBadgeClass } from "@/lib/format";
 import PushSubscribeButton from "@/components/PushSubscribeButton";
+import NotifyNewItemsToggle from "@/components/NotifyNewItemsToggle";
 import { getCreditBalance } from "@/lib/credit";
+import { updateNotificationPreference } from "./actions";
 
 export default async function AccountPage() {
   const user = await requireUser();
@@ -46,9 +48,13 @@ export default async function AccountPage() {
               <p className="text-bone">{profile?.phone || "—"}</p>
             </div>
           </div>
-          <div className="mt-4 border-t border-ink-700 pt-4">
+          <div className="mt-4 border-t border-ink-700 pt-4 space-y-3">
             <p className="label mb-2">Notifications</p>
             <PushSubscribeButton />
+            <NotifyNewItemsToggle
+              defaultChecked={profile?.notifyNewItems ?? false}
+              action={updateNotificationPreference.bind(null, user.id)}
+            />
           </div>
         </div>
       </div>

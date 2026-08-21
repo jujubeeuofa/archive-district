@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/session";
 import { AuthenticityStatus, ItemSource, ItemStatus } from "@/lib/enums";
 import { parseChecklistFromFormData } from "@/lib/authenticity";
+import { notifyNewItemSubscribers } from "@/lib/notifications";
 
 function num(formData: FormData, key: string): number {
   const v = Number(formData.get(key));
@@ -39,6 +40,16 @@ export async function createItem(formData: FormData) {
       photos: { create: photoUrls.map((dataUrl) => ({ dataUrl })) },
     },
   });
+
+  // Newly created items go straight to IN_STOCK unless the admin picked a
+  // different starting status (e.g. PENDING_INTAKE while it's still being
+  // authenticated) — only notify opted-in clients once it's actually
+  // visible in the shop.
+  if (item.status === ItemStatus.IN_STOCK) {
+    await notifyNewItemSubscribers(item).catch((err) => {
+      console.error("Failed to send new-item push notifications:", err);
+    });
+  }
 
   redirect(`/admin/inventory/${item.id}`);
 }
