@@ -1,7 +1,7 @@
 # Archive District — Designer Resale CRM
 
 A working full-stack app for Archive District (Chrome Hearts-heavy
-streetwear/accessories resale, run by a father-son team). It covers the
+streetwear/accessories resale). It covers the
 storefront, checkout, a "sell to us" client intake flow with an authenticity
 checklist, and an admin back office for inventory, submissions, orders,
 reporting, and clients — including a real (installable) PWA shell and Web

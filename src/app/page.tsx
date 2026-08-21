@@ -19,8 +19,8 @@ export default async function HomePage() {
           Authenticated Chrome Hearts &amp; streetwear, bought and sold.
         </h1>
         <p className="mx-auto mt-4 max-w-xl text-ink-300">
-          A father-son shop specializing in Chrome Hearts, Rick Owens, Supreme, and other
-          high-end designer streetwear and accessories.
+          Specializing in Chrome Hearts, Rick Owens, Supreme, and other high-end designer
+          streetwear and accessories.
         </p>
         <div className="mt-8 flex flex-wrap justify-center gap-3">
           <Link href="/shop" className="btn-primary">
