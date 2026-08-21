@@ -17,7 +17,19 @@ export default withAuth(
     // explicitly so token verification here actually works in production.
     secret: process.env.NEXTAUTH_SECRET,
     callbacks: {
-      authorized: ({ token }) => !!token,
+      authorized: ({ token, req }) => {
+        console.log(
+          "[mw-debug] path=",
+          req.nextUrl.pathname,
+          "hasToken=",
+          !!token,
+          "hasSecret=",
+          !!process.env.NEXTAUTH_SECRET,
+          "cookieNames=",
+          req.cookies.getAll().map((c) => c.name).join(",")
+        );
+        return !!token;
+      },
     },
     pages: {
       signIn: "/login",
