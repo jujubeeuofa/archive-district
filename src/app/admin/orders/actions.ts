@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { requireAdmin } from "@/lib/session";
+import { requireStaff } from "@/lib/session";
 import { ItemStatus, OrderStatus, TenderType } from "@/lib/enums";
 import { markOrderPaidAndFulfill } from "@/lib/orderFulfillment";
 
@@ -23,7 +23,7 @@ import { markOrderPaidAndFulfill } from "@/lib/orderFulfillment";
  * a webhook that calls the same createWalkInSale-style logic.
  */
 export async function createWalkInSale(formData: FormData) {
-  await requireAdmin();
+  await requireStaff();
 
   const buyerId = String(formData.get("buyerId") || "").trim();
   const itemId = String(formData.get("itemId") || "").trim();
@@ -60,7 +60,7 @@ export async function createWalkInSale(formData: FormData) {
  * Stripe involved. Marks the order PAID and its items SOLD.
  */
 export async function logManualPayment(orderId: string, formData: FormData) {
-  await requireAdmin();
+  await requireStaff();
 
   const tenderType = String(formData.get("tenderType") || TenderType.CASH) as TenderType;
 
@@ -75,7 +75,7 @@ export async function logManualPayment(orderId: string, formData: FormData) {
 }
 
 export async function updateOrderStatus(orderId: string, formData: FormData) {
-  await requireAdmin();
+  await requireStaff();
   const status = String(formData.get("status") || "") as OrderStatus;
   await prisma.order.update({ where: { id: orderId }, data: { status } });
   revalidatePath(`/admin/orders/${orderId}`);
