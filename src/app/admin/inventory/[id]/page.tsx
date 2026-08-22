@@ -357,7 +357,8 @@ export default async function AdminItemDetailPage({ params }: { params: { id: st
                   </button>
                 </form>
               </details>
-</div>
+            )}
+          </div>
         </div>
       </div>
     </div>
