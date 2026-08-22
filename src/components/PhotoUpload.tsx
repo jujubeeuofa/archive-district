@@ -8,9 +8,64 @@ type PhotoUploadProps = {
   maxPhotos?: number;
 };
 
+// Longest side a stored photo is allowed to be, and the JPEG quality used
+// when re-encoding. A modern phone photo is routinely 3-5MB straight off the
+// camera; three or four of those in one form submission blow past both
+// Next.js's server-action body limit and Vercel's hard 4.5MB request cap
+// (which can't be raised). Downscaling client-side before it ever becomes a
+// data URI keeps a full 8-photo item comfortably under a few hundred KB.
+const MAX_DIMENSION = 1600;
+const JPEG_QUALITY = 0.82;
+
+function readAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
 /**
- * Lets the user pick one or more image files, converts them to base64 data
- * URIs client-side (no external object storage needed for the prototype —
+ * Downscales an image file to at most MAX_DIMENSION on its longest side and
+ * re-encodes it as a JPEG data URI, so it's small enough to embed inline.
+ * `imageOrientation: "from-image"` makes createImageBitmap bake in the
+ * photo's EXIF rotation (phone photos are very often shot sideways/upside
+ * down relative to their stored pixels) so it doesn't get lost once the
+ * canvas flattens the pixels. Falls back to the original, uncompressed data
+ * URI if the browser can't decode the image (e.g. an unsupported format) or
+ * lacks canvas/createImageBitmap support, rather than dropping the photo.
+ */
+async function compressImage(file: File): Promise<string> {
+  let bitmap: ImageBitmap;
+  try {
+    bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
+  } catch {
+    return readAsDataUrl(file);
+  }
+
+  try {
+    const scale = Math.min(1, MAX_DIMENSION / Math.max(bitmap.width, bitmap.height));
+    const width = Math.max(1, Math.round(bitmap.width * scale));
+    const height = Math.max(1, Math.round(bitmap.height * scale));
+
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return readAsDataUrl(file);
+
+    ctx.drawImage(bitmap, 0, 0, width, height);
+    return canvas.toDataURL("image/jpeg", JPEG_QUALITY);
+  } finally {
+    bitmap.close();
+  }
+}
+
+/**
+ * Lets the user pick one or more image files, downscales + re-encodes each
+ * one client-side (see compressImage above) and converts the result to a
+ * base64 data URI (no external object storage needed for the prototype —
  * see README for moving this to S3/Cloudinary in production), and renders
  * hidden inputs so a normal <form> submit (server action) carries the
  * resulting data URIs as repeated `name` fields.
@@ -18,6 +73,7 @@ type PhotoUploadProps = {
 export default function PhotoUpload({ name, initialPhotos = [], maxPhotos = 6 }: PhotoUploadProps) {
   const [photos, setPhotos] = useState<string[]>(initialPhotos);
   const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   async function handleFiles(files: FileList | null) {
@@ -30,22 +86,20 @@ export default function PhotoUpload({ name, initialPhotos = [], maxPhotos = 6 }:
       return;
     }
 
-    const toRead = Array.from(files).slice(0, remaining);
-    const results: string[] = [];
+    const toRead = Array.from(files)
+      .filter((file) => file.type.startsWith("image/"))
+      .slice(0, remaining);
 
-    for (const file of toRead) {
-      if (!file.type.startsWith("image/")) continue;
-      const dataUrl = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
-      results.push(dataUrl);
+    setBusy(true);
+    try {
+      const results = await Promise.all(toRead.map(compressImage));
+      setPhotos((prev) => [...prev, ...results]);
+    } catch {
+      setError("Couldn't process one of those photos — try a different file.");
+    } finally {
+      setBusy(false);
+      if (inputRef.current) inputRef.current.value = "";
     }
-
-    setPhotos((prev) => [...prev, ...results]);
-    if (inputRef.current) inputRef.current.value = "";
   }
 
   function removePhoto(index: number) {
@@ -81,14 +135,16 @@ export default function PhotoUpload({ name, initialPhotos = [], maxPhotos = 6 }:
           type="file"
           accept="image/*"
           multiple
+          disabled={busy}
           onChange={(e) => handleFiles(e.target.files)}
-          className="block w-full text-sm text-ink-300 file:mr-3 file:rounded-lg file:border-0 file:bg-ink-700 file:px-3 file:py-2 file:text-sm file:text-bone hover:file:bg-ink-600"
+          className="block w-full text-sm text-ink-300 file:mr-3 file:rounded-lg file:border-0 file:bg-ink-700 file:px-3 file:py-2 file:text-sm file:text-bone hover:file:bg-ink-600 disabled:opacity-60"
         />
       )}
 
+      {busy && <p className="mt-1 text-xs text-ink-400">Processing photo(s)…</p>}
       {error && <p className="mt-1 text-xs text-red-300">{error}</p>}
       <p className="mt-1 text-xs text-ink-500">
-        Up to {maxPhotos} photos. Stored inline as base64 for this prototype.
+        Up to {maxPhotos} photos. Resized and stored inline for this prototype.
       </p>
     </div>
   );
