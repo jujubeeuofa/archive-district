@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
 import { SubmissionStatus } from "@/lib/enums";
+import { notifyStaffOfSubmission } from "@/lib/staffAlerts";
 
 export async function submitSellForm(formData: FormData) {
   const user = await requireUser();
@@ -31,6 +32,10 @@ export async function submitSellForm(formData: FormData) {
       status: SubmissionStatus.SUBMITTED,
       photos: { create: photoUrls.map((dataUrl) => ({ dataUrl })) },
     },
+  });
+
+  await notifyStaffOfSubmission(user, submission).catch((err) => {
+    console.error("Failed to notify staff of new sell submission:", err);
   });
 
   redirect(`/account/submissions/${submission.id}`);
