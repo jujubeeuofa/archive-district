@@ -1,15 +1,17 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { requireAdmin } from "@/lib/session";
+import { requireStaff } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { Role } from "@/lib/enums";
 import { formatMoney, formatDate, statusBadgeClass } from "@/lib/format";
 import { getCreditBalance } from "@/lib/credit";
+import { canAdjustCredit } from "@/lib/permissions";
 import AdminNav from "@/components/AdminNav";
 import { adjustCredit } from "../actions";
 
 export default async function AdminClientDetailPage({ params }: { params: { id: string } }) {
-  await requireAdmin();
+  const user = await requireStaff();
+  const showAdjust = canAdjustCredit(user.role);
 
   const client = await prisma.user.findUnique({ where: { id: params.id } });
   if (!client || client.role !== Role.CLIENT) notFound();
@@ -83,27 +85,33 @@ export default async function AdminClientDetailPage({ params }: { params: { id: 
             <p className="label">Trade-in credit balance</p>
             <p className="mt-1 text-2xl font-semibold text-emerald-400">{formatMoney(creditBalance)}</p>
 
-            <form action={boundAdjust} className="mt-4 space-y-2 border-t border-ink-700 pt-4">
-              <p className="label">Adjust balance</p>
-              <input
-                className="input"
-                type="number"
-                name="amount"
-                step="0.01"
-                placeholder="Amount (e.g. 25 or -10)"
-                required
-              />
-              <input
-                className="input"
-                type="text"
-                name="reason"
-                placeholder="Reason (required)"
-                required
-              />
-              <button type="submit" className="btn-secondary w-full">
-                Apply adjustment
-              </button>
-            </form>
+            {showAdjust ? (
+              <form action={boundAdjust} className="mt-4 space-y-2 border-t border-ink-700 pt-4">
+                <p className="label">Adjust balance</p>
+                <input
+                  className="input"
+                  type="number"
+                  name="amount"
+                  step="0.01"
+                  placeholder="Amount (e.g. 25 or -10)"
+                  required
+                />
+                <input
+                  className="input"
+                  type="text"
+                  name="reason"
+                  placeholder="Reason (required)"
+                  required
+                />
+                <button type="submit" className="btn-secondary w-full">
+                  Apply adjustment
+                </button>
+              </form>
+            ) : (
+              <p className="mt-4 border-t border-ink-700 pt-4 text-xs text-ink-500">
+                Only an Admin can adjust a client&apos;s store-credit balance.
+              </p>
+            )}
 
             {creditTransactions.length > 0 && (
               <div className="mt-4 divide-y divide-ink-800 border-t border-ink-700 pt-3">
