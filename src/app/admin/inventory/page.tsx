@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { requireAdmin } from "@/lib/session";
+import { requireStaff } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { formatMoney, statusBadgeClass } from "@/lib/format";
 import { computeMargin } from "@/lib/format";
+import { canSeeCost } from "@/lib/permissions";
 import AdminNav from "@/components/AdminNav";
 
 export const dynamic = "force-dynamic";
@@ -12,7 +13,8 @@ export default async function AdminInventoryPage({
 }: {
   searchParams: { status?: string; brand?: string; q?: string; authenticity?: string };
 }) {
-  await requireAdmin();
+  const user = await requireStaff();
+  const showCost = canSeeCost(user.role);
 
   const { status, brand, q, authenticity } = searchParams;
   const where: Record<string, unknown> = {};
@@ -130,9 +132,9 @@ export default async function AdminInventoryPage({
             <tr>
               <th className="px-4 py-2">Title</th>
               <th className="px-4 py-2">Brand</th>
-              <th className="px-4 py-2">Cost</th>
+              {showCost && <th className="px-4 py-2">Cost</th>}
               <th className="px-4 py-2">List</th>
-              <th className="px-4 py-2">Margin</th>
+              {showCost && <th className="px-4 py-2">Margin</th>}
               <th className="px-4 py-2">Status</th>
               <th className="px-4 py-2">Authenticity</th>
             </tr>
@@ -148,11 +150,13 @@ export default async function AdminInventoryPage({
                     </Link>
                   </td>
                   <td className="px-4 py-2 text-ink-300">{item.brand}</td>
-                  <td className="px-4 py-2">{formatMoney(item.costPrice)}</td>
+                  {showCost && <td className="px-4 py-2">{formatMoney(item.costPrice)}</td>}
                   <td className="px-4 py-2">{formatMoney(item.listPrice)}</td>
-                  <td className={`px-4 py-2 ${margin >= 0 ? "text-emerald-400" : "text-red-400"}`}>
-                    {formatMoney(margin)}
-                  </td>
+                  {showCost && (
+                    <td className={`px-4 py-2 ${margin >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                      {formatMoney(margin)}
+                    </td>
+                  )}
                   <td className="px-4 py-2">
                     <span className={`badge ${statusBadgeClass(item.status)}`}>{item.status.replace("_", " ")}</span>
                   </td>
@@ -166,7 +170,7 @@ export default async function AdminInventoryPage({
             })}
             {items.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-4 py-6 text-center text-ink-500">
+                <td colSpan={showCost ? 7 : 5} className="px-4 py-6 text-center text-ink-500">
                   No items match.
                 </td>
               </tr>

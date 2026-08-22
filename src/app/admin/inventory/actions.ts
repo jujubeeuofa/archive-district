@@ -3,8 +3,8 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { requireAdmin } from "@/lib/session";
-import { AuthenticityStatus, ItemSource, ItemStatus } from "@/lib/enums";
+import { requireAdmin, requireStaff } from "@/lib/session";
+import { AuthenticityStatus, ItemSource, ItemStatus, Role } from "@/lib/enums";
 import { parseChecklistFromFormData } from "@/lib/authenticity";
 import { notifyNewItemSubscribers } from "@/lib/notifications";
 import { findVisualMatches, visionConfigured, type VisualMatch } from "@/lib/visionMatch";
@@ -20,7 +20,7 @@ function vendorId(formData: FormData): string | null {
 }
 
 export async function createItem(formData: FormData) {
-  await requireAdmin();
+  const user = await requireStaff();
 
   const photoUrls = formData.getAll("photos").map(String).filter(Boolean);
 
@@ -31,7 +31,11 @@ export async function createItem(formData: FormData) {
       category: String(formData.get("category") || "").trim(),
       condition: String(formData.get("condition") || "").trim(),
       description: String(formData.get("description") || "").trim(),
-      costPrice: num(formData, "costPrice"),
+      // Sales staff never see cost price, so their New Item form doesn't
+      // include the field at all — force it to 0 server-side too rather
+      // than trusting whatever a raw form POST happens to include. Admin
+      // fills in the real cost later from the item's edit page.
+      costPrice: user.role === Role.ADMIN ? num(formData, "costPrice") : 0,
       listPrice: num(formData, "listPrice"),
       status: (String(formData.get("status") || ItemStatus.IN_STOCK) as ItemStatus),
       // authenticityStatus defaults to UNVERIFIED (schema default) — set
@@ -56,7 +60,7 @@ export async function createItem(formData: FormData) {
 }
 
 export async function updateItem(itemId: string, formData: FormData) {
-  await requireAdmin();
+  const user = await requireStaff();
 
   const soldPriceRaw = String(formData.get("soldPrice") || "").trim();
 
@@ -68,7 +72,11 @@ export async function updateItem(itemId: string, formData: FormData) {
       category: String(formData.get("category") || "").trim(),
       condition: String(formData.get("condition") || "").trim(),
       description: String(formData.get("description") || "").trim(),
-      costPrice: num(formData, "costPrice"),
+      // Sales staff's edit form doesn't render the cost price field, so
+      // omit it from the update entirely when they submit — leaving it out
+      // of a Prisma update() keeps the existing value, rather than the
+      // field silently getting overwritten to 0.
+      ...(user.role === Role.ADMIN ? { costPrice: num(formData, "costPrice") } : {}),
       listPrice: num(formData, "listPrice"),
       soldPrice: soldPriceRaw ? Number(soldPriceRaw) : null,
       status: String(formData.get("status") || ItemStatus.IN_STOCK) as ItemStatus,
@@ -99,7 +107,7 @@ export async function updateItem(itemId: string, formData: FormData) {
  * reports) reads.
  */
 export async function saveItemAuthenticityCheck(itemId: string, formData: FormData) {
-  const admin = await requireAdmin();
+  const admin = await requireStaff();
 
   const item = await prisma.item.findUnique({ where: { id: itemId } });
   if (!item) return;
@@ -148,7 +156,7 @@ export type VisualMatchResponse =
  * called directly from a client component, not via a <form action>.
  */
 export async function findVisualMatchesForItem(itemId: string): Promise<VisualMatchResponse> {
-  await requireAdmin();
+  await requireStaff();
 
   if (!visionConfigured()) {
     return {
