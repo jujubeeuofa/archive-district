@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { requireAdmin } from "@/lib/session";
+import { requireAdmin, requireStaff } from "@/lib/session";
 import { ConsignmentStatus } from "@/lib/enums";
 import { generateSignToken } from "@/lib/consignment";
 
@@ -14,7 +14,7 @@ import { generateSignToken } from "@/lib/consignment";
  * textarea before submitting.
  */
 export async function createConsignmentAgreement(itemId: string, formData: FormData) {
-  await requireAdmin();
+  await requireStaff();
 
   const consignorName = String(formData.get("consignorName") || "").trim();
   const consignorSplitPct = Number(formData.get("consignorSplitPct"));
@@ -47,7 +47,7 @@ export async function createConsignmentAgreement(itemId: string, formData: FormD
 
 /** Only allowed while still DRAFT — once SENT, the terms are what's on offer. */
 export async function updateConsignmentTerms(agreementId: string, formData: FormData) {
-  await requireAdmin();
+  await requireStaff();
 
   const agreement = await prisma.consignmentAgreement.findUnique({ where: { id: agreementId } });
   if (!agreement || agreement.status !== ConsignmentStatus.DRAFT) return;
@@ -78,7 +78,12 @@ export async function updateConsignmentTerms(agreementId: string, formData: Form
   revalidatePath(`/admin/consignments/${agreementId}`);
 }
 
-/** Marks the agreement SENT — just a tracking status; the sign link works regardless. */
+/**
+ * Marks the agreement SENT — this is the shop actually committing to the
+ * deal terms, so it's Admin-only ("can't accept a consignment without
+ * manager approval"). Sales can still draft and edit the terms up to this
+ * point via createConsignmentAgreement / updateConsignmentTerms above.
+ */
 export async function markConsignmentSent(agreementId: string) {
   await requireAdmin();
   const agreement = await prisma.consignmentAgreement.findUnique({ where: { id: agreementId } });

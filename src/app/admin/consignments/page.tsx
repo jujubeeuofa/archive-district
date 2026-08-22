@@ -1,11 +1,11 @@
 import Link from "next/link";
-import { requireAdmin } from "@/lib/session";
+import { requireStaff } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { formatMoney, formatDate, statusBadgeClass } from "@/lib/format";
 import AdminNav from "@/components/AdminNav";
 
 export default async function AdminConsignmentsPage() {
-  await requireAdmin();
+  await requireStaff();
 
   const agreements = await prisma.consignmentAgreement.findMany({
     include: { item: true },
