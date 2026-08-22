@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { requireAdmin } from "@/lib/session";
+import { requireStaff } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { formatMoney, formatDate, statusBadgeClass } from "@/lib/format";
 import AdminNav from "@/components/AdminNav";
+import { canFinalizeConsignment } from "@/lib/permissions";
 import {
   updateConsignmentTerms,
   markConsignmentSent,
@@ -12,7 +13,8 @@ import {
 } from "../actions";
 
 export default async function ConsignmentDetailPage({ params }: { params: { id: string } }) {
-  await requireAdmin();
+  const user = await requireStaff();
+  const canFinalize = canFinalizeConsignment(user.role);
 
   const agreement = await prisma.consignmentAgreement.findUnique({
     where: { id: params.id },
@@ -175,11 +177,17 @@ export default async function ConsignmentDetailPage({ params }: { params: { id: 
               <p className="mt-2 break-all rounded-lg border border-ink-700 bg-ink-900 px-3 py-2 text-xs text-accent">
                 {signUrl}
               </p>
-              <form action={boundSend} className="mt-3">
-                <button type="submit" className="btn-primary w-full">
-                  Mark as sent
-                </button>
-              </form>
+              {canFinalize ? (
+                <form action={boundSend} className="mt-3">
+                  <button type="submit" className="btn-primary w-full">
+                    Mark as sent
+                  </button>
+                </form>
+              ) : (
+                <p className="mt-3 text-xs text-ink-500">
+                  Sending this agreement commits the shop to these terms — an Admin needs to mark it sent.
+                </p>
+              )}
             </div>
           )}
 
@@ -213,12 +221,16 @@ export default async function ConsignmentDetailPage({ params }: { params: { id: 
                 <p className="text-lg font-semibold text-amber-300">
                   Owed {formatMoney(agreement.payoutAmount)}
                 </p>
-                <form action={boundMarkPaid} className="mt-3 space-y-2">
-                  <input className="input" type="text" name="paidNote" placeholder="Paid via… (optional note)" />
-                  <button type="submit" className="btn-primary w-full">
-                    Mark paid
-                  </button>
-                </form>
+                {canFinalize ? (
+                  <form action={boundMarkPaid} className="mt-3 space-y-2">
+                    <input className="input" type="text" name="paidNote" placeholder="Paid via… (optional note)" />
+                    <button type="submit" className="btn-primary w-full">
+                      Mark paid
+                    </button>
+                  </form>
+                ) : (
+                  <p className="mt-3 text-xs text-ink-500">Only an Admin can mark a consignor payout paid.</p>
+                )}
               </>
             )}
             {agreement.payoutStatus === "PAID" && (
@@ -234,7 +246,7 @@ export default async function ConsignmentDetailPage({ params }: { params: { id: 
             )}
           </div>
 
-          {agreement.status !== "VOIDED" && agreement.status !== "SIGNED" && (
+          {canFinalize && agreement.status !== "VOIDED" && agreement.status !== "SIGNED" && (
             <form action={boundVoid}>
               <button type="submit" className="btn-danger w-full">
                 Void agreement
