@@ -1,13 +1,16 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { requireAdmin } from "@/lib/session";
+import { requireStaff } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { updateVendor, deleteVendor } from "../actions";
 import AdminNav from "@/components/AdminNav";
 import { formatMoney } from "@/lib/format";
+import { canDelete, canSeeCost } from "@/lib/permissions";
 
 export default async function VendorDetailPage({ params }: { params: { id: string } }) {
-  await requireAdmin();
+  const user = await requireStaff();
+  const showCost = canSeeCost(user.role);
+  const showDelete = canDelete(user.role);
 
   const vendor = await prisma.vendor.findUnique({
     where: { id: params.id },
@@ -25,11 +28,13 @@ export default async function VendorDetailPage({ params }: { params: { id: strin
 
       <div className="flex items-start justify-between gap-4">
         <h1 className="text-2xl font-display uppercase text-bone">{vendor.name}</h1>
-        <form action={boundDelete}>
-          <button type="submit" className="btn-danger">
-            Delete vendor
-          </button>
-        </form>
+        {showDelete && (
+          <form action={boundDelete}>
+            <button type="submit" className="btn-danger">
+              Delete vendor
+            </button>
+          </form>
+        )}
       </div>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-3">
@@ -66,13 +71,15 @@ export default async function VendorDetailPage({ params }: { params: { id: strin
         </form>
 
         <div className="space-y-4">
-          <div className="card p-5">
-            <p className="label">Total spend</p>
-            <p className="mt-1 text-2xl font-semibold text-bone">{formatMoney(totalSpend)}</p>
-            <p className="text-xs text-ink-400">
-              Sum of cost price across {vendor.items.length} item{vendor.items.length === 1 ? "" : "s"}
-            </p>
-          </div>
+          {showCost && (
+            <div className="card p-5">
+              <p className="label">Total spend</p>
+              <p className="mt-1 text-2xl font-semibold text-bone">{formatMoney(totalSpend)}</p>
+              <p className="text-xs text-ink-400">
+                Sum of cost price across {vendor.items.length} item{vendor.items.length === 1 ? "" : "s"}
+              </p>
+            </div>
+          )}
 
           <div className="card p-5">
             <p className="label mb-2">Items from this vendor</p>
@@ -85,7 +92,9 @@ export default async function VendorDetailPage({ params }: { params: { id: strin
                     <Link href={`/admin/inventory/${item.id}`} className="text-bone hover:text-accent">
                       {item.title}
                     </Link>
-                    <span className="shrink-0 text-xs text-ink-400">{formatMoney(item.costPrice)}</span>
+                    {showCost && (
+                      <span className="shrink-0 text-xs text-ink-400">{formatMoney(item.costPrice)}</span>
+                    )}
                   </li>
                 ))}
               </ul>
