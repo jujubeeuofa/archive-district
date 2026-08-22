@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { requireAdmin } from "@/lib/session";
+import { requireStaff } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { logManualPayment, updateOrderStatus } from "../actions";
 import AdminNav from "@/components/AdminNav";
@@ -8,7 +8,7 @@ import { formatMoney, formatDate, statusBadgeClass } from "@/lib/format";
 import { OrderStatus } from "@/lib/enums";
 
 export default async function AdminOrderDetailPage({ params }: { params: { id: string } }) {
-  const admin = await requireAdmin();
+  const admin = await requireStaff();
 
   const order = await prisma.order.findUnique({
     where: { id: params.id },
