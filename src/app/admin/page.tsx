@@ -4,9 +4,11 @@ import { prisma } from "@/lib/prisma";
 import { ItemStatus, OrderStatus, SubmissionStatus } from "@/lib/enums";
 import { formatMoney, formatDate, statusBadgeClass } from "@/lib/format";
 import AdminNav from "@/components/AdminNav";
+import { updateMyAlertPrefs } from "./staff/actions";
 
 export default async function AdminDashboard() {
-  await requireStaff();
+  const me = await requireStaff();
+  const myProfile = await prisma.user.findUnique({ where: { id: me.id } });
 
   const [revenueAgg, itemsInStock, pendingSubmissions, pendingAuth, flaggedItems, recentOrders] = await Promise.all([
     prisma.order.aggregate({
@@ -62,6 +64,52 @@ export default async function AdminDashboard() {
           );
         })}
       </div>
+
+      {myProfile && (
+        <div className="mt-8 card max-w-xl p-6">
+          <h2 className="text-lg font-semibold text-bone">Your alert preferences</h2>
+          <p className="mt-1 text-sm text-ink-400">
+            Get notified when a client books a showroom visit, submits something to sell, or
+            completes a purchase.
+          </p>
+          <form action={updateMyAlertPrefs} className="mt-4 space-y-3">
+            <div>
+              <label className="label" htmlFor="phone">Phone (for SMS)</label>
+              <input
+                className="input"
+                id="phone"
+                name="phone"
+                type="tel"
+                defaultValue={myProfile.phone || ""}
+                placeholder="+1 602 555 0100"
+              />
+            </div>
+            <div className="flex flex-col gap-2 sm:flex-row sm:gap-6">
+              <label className="flex items-center gap-2 text-sm text-bone">
+                <input
+                  type="checkbox"
+                  name="staffNotifyEmail"
+                  defaultChecked={myProfile.staffNotifyEmail}
+                  className="h-4 w-4 shrink-0 rounded border-ink-600 bg-ink-800 text-accent"
+                />
+                <span>Email me</span>
+              </label>
+              <label className="flex items-center gap-2 text-sm text-bone">
+                <input
+                  type="checkbox"
+                  name="staffNotifySms"
+                  defaultChecked={myProfile.staffNotifySms}
+                  className="h-4 w-4 shrink-0 rounded border-ink-600 bg-ink-800 text-accent"
+                />
+                <span>Text me</span>
+              </label>
+            </div>
+            <button type="submit" className="btn-secondary">
+              Save preferences
+            </button>
+          </form>
+        </div>
+      )}
 
       <div className="mt-8">
         <div className="flex items-center justify-between">
