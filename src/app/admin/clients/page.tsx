@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireAdmin } from "@/lib/session";
+import { requireStaff } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { Role } from "@/lib/enums";
 import { formatDate, formatMoney } from "@/lib/format";
@@ -7,7 +7,7 @@ import AdminNav from "@/components/AdminNav";
 import SendTestPushButton from "@/components/SendTestPushButton";
 
 export default async function AdminClientsPage() {
-  await requireAdmin();
+  await requireStaff();
 
   const clients = await prisma.user.findMany({
     where: { role: Role.CLIENT },
