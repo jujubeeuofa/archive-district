@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { ItemStatus, OrderStatus, ConsignmentPayoutStatus, CreditTransactionType } from "@/lib/enums";
 import { computeConsignorPayout } from "@/lib/consignment";
+import { notifyStaffOfPurchase } from "@/lib/staffAlerts";
 
 /**
  * The single place an order actually gets marked paid and its items marked
@@ -19,11 +20,15 @@ import { computeConsignorPayout } from "@/lib/consignment";
 export async function markOrderPaidAndFulfill(orderId: string) {
   const order = await prisma.order.findUnique({
     where: { id: orderId },
-    include: { items: { include: { item: { include: { consignmentAgreement: true } } } } },
+    include: { buyer: true, items: { include: { item: { include: { consignmentAgreement: true } } } } },
   });
   if (!order || order.status === OrderStatus.PAID) return;
 
   await prisma.order.update({ where: { id: orderId }, data: { status: OrderStatus.PAID } });
+
+  await notifyStaffOfPurchase(order.buyer, order).catch((err) => {
+    console.error("Failed to notify staff of new purchase:", err);
+  });
 
   for (const oi of order.items) {
     await prisma.item.update({
