@@ -1,10 +1,10 @@
 import Link from "next/link";
-import { requireAdmin } from "@/lib/session";
+import { requireStaff } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import AdminNav from "@/components/AdminNav";
 
 export default async function AdminVendorsPage() {
-  await requireAdmin();
+  await requireStaff();
 
   const vendors = await prisma.vendor.findMany({
     include: { _count: { select: { items: true } } },

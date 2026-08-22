@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { requireAdmin } from "@/lib/session";
+import { requireAdmin, requireStaff } from "@/lib/session";
 
 function trimmedOrNull(formData: FormData, key: string): string | null {
   const v = String(formData.get(key) || "").trim();
@@ -11,7 +11,7 @@ function trimmedOrNull(formData: FormData, key: string): string | null {
 }
 
 export async function createVendor(formData: FormData) {
-  await requireAdmin();
+  await requireStaff();
 
   const name = String(formData.get("name") || "").trim();
   if (!name) return;
@@ -31,7 +31,7 @@ export async function createVendor(formData: FormData) {
 }
 
 export async function updateVendor(vendorId: string, formData: FormData) {
-  await requireAdmin();
+  await requireStaff();
 
   const name = String(formData.get("name") || "").trim();
   if (!name) return;
