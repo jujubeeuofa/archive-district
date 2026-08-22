@@ -1,12 +1,12 @@
 import Link from "next/link";
-import { requireAdmin } from "@/lib/session";
+import { requireStaff } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { ItemStatus, OrderStatus, SubmissionStatus } from "@/lib/enums";
 import { formatMoney, formatDate, statusBadgeClass } from "@/lib/format";
 import AdminNav from "@/components/AdminNav";
 
 export default async function AdminDashboard() {
-  await requireAdmin();
+  await requireStaff();
 
   const [revenueAgg, itemsInStock, pendingSubmissions, pendingAuth, flaggedItems, recentOrders] = await Promise.all([
     prisma.order.aggregate({
