@@ -25,8 +25,15 @@ model User {
   name         String
   email        String   @unique
   passwordHash String
-  /// Role: "ADMIN" | "CLIENT"
+  /// Role: "ADMIN" | "SALES" | "CLIENT" — ADMIN and SALES are staff (can sign
+  /// into /admin); CLIENT is a storefront customer account. See
+  /// src/lib/permissions.ts for what each staff role can actually do.
   role         String   @default("CLIENT")
+  /// Staff-only: false revokes a SALES/ADMIN account's ability to log in,
+  /// without deleting their history (authenticity checks reviewed, messages
+  /// sent, credit transactions created, etc. all stay intact). Always true
+  /// for CLIENT accounts — there's no "deactivate a customer" flow.
+  active       Boolean  @default(true)
   phone        String?
   notifyNewItems Boolean @default(false)
   createdAt    DateTime @default(now())
@@ -36,6 +43,7 @@ model User {
   messages             Message[]
   pushSubscriptions    PushSubscription[]
   authenticityChecksDone AuthenticityCheck[]
+  appointments         Appointment[]
 
   creditTransactions        CreditTransaction[] @relation("CreditTransactionsForUser")
   creditTransactionsCreated CreditTransaction[] @relation("CreditTransactionsCreatedBy")
@@ -285,4 +293,42 @@ model PushSubscription {
   p256dh    String
   auth      String
   createdAt DateTime @default(now())
+}
+
+/// Recurring weekly showroom hours, one row per day of week (0=Sunday .. 6=
+/// Saturday, JS Date.getDay() convention) — see src/lib/appointments.ts,
+/// which turns this + AppointmentSettings.slotMinutes into actual bookable
+/// slots. Seeded with one row per weekday by the migration that introduces
+/// this table, so the admin settings form always has all 7 to edit.
+model AppointmentAvailability {
+  id        String  @id @default(cuid())
+  dayOfWeek Int     @unique
+  isOpen    Boolean @default(false)
+  /// "HH:MM" 24-hour, showroom local time (America/Phoenix).
+  openTime  String
+  closeTime String
+}
+
+/// Singleton config row (fixed id "singleton") for appointment slot length.
+/// Split out from AppointmentAvailability since it's one shop-wide setting,
+/// not per-day.
+model AppointmentSettings {
+  id          String @id @default("singleton")
+  slotMinutes Int    @default(45)
+}
+
+/// A booked showroom visit. Auto-confirmed on creation — see
+/// src/lib/appointments.ts for slot availability + overlap checking.
+model Appointment {
+  id        String   @id @default(cuid())
+  clientId  String
+  client    User     @relation(fields: [clientId], references: [id])
+  startAt   DateTime
+  endAt     DateTime
+  /// AppointmentStatus: "CONFIRMED" | "CANCELED" | "COMPLETED" | "NO_SHOW"
+  status    String   @default("CONFIRMED")
+  note      String?
+  createdAt DateTime @default(now())
+
+  @@index([startAt])
 }
