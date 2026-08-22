@@ -1,18 +1,42 @@
 /**
  * Visual match search via Google Cloud Vision's Web Detection feature — the
- * same underlying tech behind Google Lens. Given a photo, it returns pages
- * across the web that contain a visually matching or similar image.
+ * same underlying tech behind Google Lens. Given a photo, it asks Google for
+ * pages across the whole web that contain a visually matching or similar
+ * image, then keeps only the ones hosted on a verified resale marketplace —
+ * see VERIFIED_RESELLERS below. Everything else Vision finds (blogs, image
+ * aggregators, unrelated storefronts, etc.) is dropped rather than shown.
  *
- * This is NOT a replacement for priceComp.ts's search-link generator, and it
- * does not scrape StockX/Grailed directly — it calls Google's own paid API
- * and simply surfaces whichever public page URLs come back, same as any
- * other legitimate use of a search API. Results aren't limited to StockX/
- * Grailed; we just sort those to the top when they show up.
+ * This does not scrape these marketplaces directly — it calls Google's own
+ * paid API and filters whichever public page URLs come back, same as any
+ * other legitimate use of a search API.
  */
 
 const VISION_ENDPOINT = "https://vision.googleapis.com/v1/images:annotate";
 
-export type MatchSource = "stockx" | "grailed" | "other";
+/**
+ * Resale marketplaces that authenticate (or otherwise vet) what they sell,
+ * roughly in the order matches are displayed. To widen or narrow which
+ * sites visual-match results are limited to, add/remove entries here — that
+ * one change flows through filtering, sorting, and the UI label together.
+ */
+const VERIFIED_RESELLERS = [
+  { source: "stockx", label: "StockX", hosts: ["stockx.com"] },
+  { source: "grailed", label: "Grailed", hosts: ["grailed.com"] },
+  { source: "goat", label: "GOAT", hosts: ["goat.com"] },
+  { source: "flightclub", label: "Flight Club", hosts: ["flightclub.com"] },
+  { source: "stadiumgoods", label: "Stadium Goods", hosts: ["stadiumgoods.com"] },
+  { source: "therealreal", label: "The RealReal", hosts: ["therealreal.com"] },
+  { source: "vestiairecollective", label: "Vestiaire Collective", hosts: ["vestiairecollective.com"] },
+  { source: "fashionphile", label: "Fashionphile", hosts: ["fashionphile.com"] },
+  { source: "rebag", label: "Rebag", hosts: ["rebag.com"] },
+] as const;
+
+export type MatchSource = (typeof VERIFIED_RESELLERS)[number]["source"];
+
+/** Display label for each source, e.g. `RESELLER_LABELS.stockx === "StockX"`. */
+export const RESELLER_LABELS: Record<MatchSource, string> = Object.fromEntries(
+  VERIFIED_RESELLERS.map((r) => [r.source, r.label])
+) as Record<MatchSource, string>;
 
 export type VisualMatch = {
   url: string;
@@ -29,15 +53,19 @@ export function visionConfigured(): boolean {
   return !!process.env.GOOGLE_VISION_API_KEY;
 }
 
-function classifySource(url: string): MatchSource {
+/** Returns the matching reseller's source key, or null if the URL's host isn't on the allowlist. */
+function classifySource(url: string): MatchSource | null {
   try {
     const host = new URL(url).hostname.replace(/^www\./, "");
-    if (host === "stockx.com" || host.endsWith(".stockx.com")) return "stockx";
-    if (host === "grailed.com" || host.endsWith(".grailed.com")) return "grailed";
+    for (const reseller of VERIFIED_RESELLERS) {
+      if (reseller.hosts.some((h) => host === h || host.endsWith(`.${h}`))) {
+        return reseller.source;
+      }
+    }
   } catch {
-    // malformed URL — fall through to "other"
+    // malformed URL — treat as unmatched
   }
-  return "other";
+  return null;
 }
 
 /** Strips the "data:image/...;base64," prefix a Photo.dataUrl is stored with. */
@@ -48,8 +76,10 @@ function base64Content(dataUrl: string): string {
 
 /**
  * Runs a Web Detection lookup for a single photo (as a data URL) and
- * returns matching pages, sorted with StockX/Grailed hits first, capped to
- * a reasonable number to show in the UI.
+ * returns matching pages that live on a verified resale marketplace (see
+ * VERIFIED_RESELLERS), sorted in that same marketplace order and capped to
+ * a reasonable number to show in the UI. Pages Vision finds anywhere else
+ * on the web are discarded.
  */
 export async function findVisualMatches(dataUrl: string): Promise<VisualMatchResult> {
   const apiKey = process.env.GOOGLE_VISION_API_KEY;
@@ -64,7 +94,9 @@ export async function findVisualMatches(dataUrl: string): Promise<VisualMatchRes
       requests: [
         {
           image: { content: base64Content(dataUrl) },
-          features: [{ type: "WEB_DETECTION", maxResults: 20 }],
+          // Ask for more than we'll show since most results get filtered
+          // out by the verified-reseller allowlist below.
+          features: [{ type: "WEB_DETECTION", maxResults: 50 }],
         },
       ],
     }),
@@ -88,20 +120,20 @@ export async function findVisualMatches(dataUrl: string): Promise<VisualMatchRes
   const matches: VisualMatch[] = [];
   for (const page of pages) {
     if (!page.url || seen.has(page.url)) continue;
+    const source = classifySource(page.url);
+    if (!source) continue; // not a verified reseller — drop it
     seen.add(page.url);
     matches.push({
       url: page.url,
       title: page.pageTitle?.trim() || null,
-      source: classifySource(page.url),
+      source,
     });
   }
 
-  // Marketplace hits first, then everything else, each in the order Vision
-  // returned them (it already ranks by match confidence).
-  matches.sort((a, b) => {
-    const rank = (m: VisualMatch) => (m.source === "other" ? 1 : 0);
-    return rank(a) - rank(b);
-  });
+  // Group by marketplace in the order VERIFIED_RESELLERS lists them, and
+  // keep Vision's own confidence order within each group.
+  const rank = new Map(VERIFIED_RESELLERS.map((r, i) => [r.source, i]));
+  matches.sort((a, b) => (rank.get(a.source) ?? 99) - (rank.get(b.source) ?? 99));
 
   const bestGuess: string | null = webDetection?.bestGuessLabels?.[0]?.label ?? null;
 

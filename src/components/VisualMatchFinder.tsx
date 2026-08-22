@@ -1,20 +1,19 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { RESELLER_LABELS } from "@/lib/visionMatch";
 import type { VisualMatchResponse } from "@/app/admin/inventory/actions";
-
-const SOURCE_LABEL: Record<string, string> = {
-  stockx: "StockX",
-  grailed: "Grailed",
-};
 
 /**
  * Google Lens-style companion to the plain-text StockX/Grailed search links
  * (see priceComp.ts): sends the item's first photo to Google Vision's Web
- * Detection API and lists back pages with a visually matching image,
- * StockX/Grailed hits sorted first. Calls the server action directly (not
- * via a <form action>) since it needs the result back to render, not just
- * to trigger a mutation.
+ * Detection API and lists back pages hosted on a verified resale
+ * marketplace (StockX, Grailed, GOAT, and others — see visionMatch.ts's
+ * VERIFIED_RESELLERS list) with a visually matching image. Anything Vision
+ * finds outside that allowlist is filtered out server-side before it ever
+ * reaches this component. Calls the server action directly (not via a
+ * <form action>) since it needs the result back to render, not just to
+ * trigger a mutation.
  */
 export default function VisualMatchFinder({
   itemId,
@@ -57,7 +56,9 @@ export default function VisualMatchFinder({
           )}
 
           {result.matches.length === 0 ? (
-            <p className="text-xs text-ink-500">No matching pages found for this photo.</p>
+            <p className="text-xs text-ink-500">
+              No matches found on a verified reseller for this photo.
+            </p>
           ) : (
             <ul className="space-y-1.5">
               {result.matches.map((m) => (
@@ -66,14 +67,9 @@ export default function VisualMatchFinder({
                     href={m.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className={
-                      m.source === "other"
-                        ? "text-xs text-ink-300 hover:underline"
-                        : "text-xs text-accent hover:text-accent-light hover:underline"
-                    }
+                    className="text-xs text-accent hover:text-accent-light hover:underline"
                   >
-                    {m.source !== "other" ? `[${SOURCE_LABEL[m.source]}] ` : ""}
-                    {m.title || m.url} ↗
+                    [{RESELLER_LABELS[m.source]}] {m.title || m.url} ↗
                   </a>
                 </li>
               ))}
@@ -83,9 +79,9 @@ export default function VisualMatchFinder({
       )}
 
       <p className="mt-3 text-xs text-ink-500">
-        Reverse-image search against the item&rsquo;s first photo — finds pages with a visually
-        similar image anywhere on the web, not limited to StockX/Grailed and not a guaranteed
-        match. Treat it as a lead to check, not a confirmed comp.
+        Reverse-image search against the item&rsquo;s first photo, limited to verified resale
+        marketplaces (StockX, Grailed, GOAT, Flight Club, Stadium Goods, The RealReal, Vestiaire
+        Collective, Fashionphile, Rebag). Treat it as a lead to check, not a confirmed comp.
       </p>
     </div>
   );
