@@ -39,12 +39,6 @@ function LoginForm() {
   return (
     <div className="mx-auto max-w-md">
       <h1 className="text-2xl font-display uppercase text-bone">Log in</h1>
-      <p className="mt-1 text-sm text-ink-300">
-        Demo credentials: <code className="text-accent">admin@example.com</code> /{" "}
-        <code className="text-accent">password123</code> (admin) or{" "}
-        <code className="text-accent">client1@example.com</code> /{" "}
-        <code className="text-accent">password123</code> (client).
-      </p>
 
       <form onSubmit={handleSubmit} className="card mt-6 space-y-4 p-6">
         {error && (
