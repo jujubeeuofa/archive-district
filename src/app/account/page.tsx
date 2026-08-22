@@ -5,12 +5,15 @@ import { formatMoney, formatDate, statusBadgeClass } from "@/lib/format";
 import PushSubscribeButton from "@/components/PushSubscribeButton";
 import NotifyNewItemsToggle from "@/components/NotifyNewItemsToggle";
 import { getCreditBalance } from "@/lib/credit";
+import { formatApptDateTime } from "@/lib/appointments";
+import { AppointmentStatus } from "@/lib/enums";
 import { updateNotificationPreference } from "./actions";
+import { cancelOwnAppointment } from "@/app/book/actions";
 
 export default async function AccountPage() {
   const user = await requireUser();
 
-  const [profile, orders, submissions, creditBalance, creditTransactions] = await Promise.all([
+  const [profile, orders, submissions, creditBalance, creditTransactions, appointments] = await Promise.all([
     prisma.user.findUnique({ where: { id: user.id } }),
     prisma.order.findMany({
       where: { buyerId: user.id },
@@ -26,6 +29,10 @@ export default async function AccountPage() {
       where: { userId: user.id },
       orderBy: { createdAt: "desc" },
       take: 10,
+    }),
+    prisma.appointment.findMany({
+      where: { clientId: user.id, status: AppointmentStatus.CONFIRMED, startAt: { gte: new Date() } },
+      orderBy: { startAt: "asc" },
     }),
   ]);
 
@@ -57,6 +64,34 @@ export default async function AccountPage() {
             />
           </div>
         </div>
+      </div>
+
+      <div>
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-bone">Showroom appointments</h2>
+          <Link href="/book" className="btn-secondary">
+            Book a visit
+          </Link>
+        </div>
+        {appointments.length === 0 ? (
+          <p className="mt-2 text-sm text-ink-400">No upcoming appointments.</p>
+        ) : (
+          <div className="mt-4 space-y-2">
+            {appointments.map((a) => (
+              <div key={a.id} className="card flex items-center justify-between gap-4 p-4">
+                <div>
+                  <p className="text-sm text-bone">{formatApptDateTime(a.startAt)}</p>
+                  {a.note && <p className="mt-1 text-xs text-ink-400">{a.note}</p>}
+                </div>
+                <form action={cancelOwnAppointment.bind(null, a.id)}>
+                  <button type="submit" className="btn-secondary shrink-0 px-3 py-1.5 text-xs">
+                    Cancel
+                  </button>
+                </form>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <div>
