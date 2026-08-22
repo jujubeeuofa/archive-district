@@ -1,7 +1,8 @@
-import { requireAdmin } from "@/lib/session";
+import { requireStaff } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { computeMargin, formatMoney } from "@/lib/format";
 import { OrderStatus } from "@/lib/enums";
+import { canSeeCost } from "@/lib/permissions";
 import AdminNav from "@/components/AdminNav";
 
 function groupMargins<T extends { costPrice: number; listPrice: number; soldPrice: number | null }>(
@@ -25,7 +26,8 @@ function groupMargins<T extends { costPrice: number; listPrice: number; soldPric
 }
 
 export default async function AdminReportsPage() {
-  await requireAdmin();
+  const user = await requireStaff();
+  const showFinancials = canSeeCost(user.role);
 
   const items = await prisma.item.findMany({
     select: { brand: true, category: true, costPrice: true, listPrice: true, soldPrice: true },
@@ -52,9 +54,15 @@ export default async function AdminReportsPage() {
       <AdminNav active="/admin/reports" />
       <h1 className="text-2xl font-display uppercase text-bone">Reports</h1>
 
+      {!showFinancials && (
+        <p className="mt-2 text-xs text-ink-500">
+          Margin figures are hidden for your role — showing item counts and revenue only.
+        </p>
+      )}
+
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
-        <ReportTable title="Margin by brand" rows={byBrand} />
-        <ReportTable title="Margin by category" rows={byCategory} />
+        <ReportTable title={showFinancials ? "Margin by brand" : "Revenue by brand"} rows={byBrand} showMargin={showFinancials} />
+        <ReportTable title={showFinancials ? "Margin by category" : "Revenue by category"} rows={byCategory} showMargin={showFinancials} />
       </div>
 
       <div className="mt-6">
@@ -92,9 +100,11 @@ export default async function AdminReportsPage() {
 function ReportTable({
   title,
   rows,
+  showMargin,
 }: {
   title: string;
   rows: { key: string; count: number; totalMargin: number; totalCost: number; totalRevenue: number }[];
+  showMargin: boolean;
 }) {
   return (
     <div>
@@ -106,7 +116,7 @@ function ReportTable({
               <th className="px-4 py-2">Name</th>
               <th className="px-4 py-2"># Items</th>
               <th className="px-4 py-2">Revenue</th>
-              <th className="px-4 py-2">Margin</th>
+              {showMargin && <th className="px-4 py-2">Margin</th>}
             </tr>
           </thead>
           <tbody>
@@ -115,14 +125,16 @@ function ReportTable({
                 <td className="px-4 py-2 text-bone">{r.key}</td>
                 <td className="px-4 py-2 text-ink-300">{r.count}</td>
                 <td className="px-4 py-2 text-bone">{formatMoney(r.totalRevenue)}</td>
-                <td className={`px-4 py-2 ${r.totalMargin >= 0 ? "text-emerald-400" : "text-red-400"}`}>
-                  {formatMoney(r.totalMargin)}
-                </td>
+                {showMargin && (
+                  <td className={`px-4 py-2 ${r.totalMargin >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                    {formatMoney(r.totalMargin)}
+                  </td>
+                )}
               </tr>
             ))}
             {rows.length === 0 && (
               <tr>
-                <td colSpan={4} className="px-4 py-6 text-center text-ink-500">
+                <td colSpan={showMargin ? 4 : 3} className="px-4 py-6 text-center text-ink-500">
                   No data yet.
                 </td>
               </tr>
