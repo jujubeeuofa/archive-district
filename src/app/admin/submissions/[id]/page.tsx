@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { requireAdmin } from "@/lib/session";
+import { requireStaff } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import {
   updateSubmissionStatus,
@@ -15,7 +15,7 @@ import { getChecklistTemplate, getReferenceGuides } from "@/lib/authenticity";
 import type { ChecklistEntry } from "@/lib/enums";
 
 export default async function AdminSubmissionDetailPage({ params }: { params: { id: string } }) {
-  const admin = await requireAdmin();
+  const admin = await requireStaff();
 
   const submission = await prisma.sellSubmission.findUnique({
     where: { id: params.id },
