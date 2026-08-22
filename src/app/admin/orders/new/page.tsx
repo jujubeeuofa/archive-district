@@ -1,4 +1,4 @@
-import { requireAdmin } from "@/lib/session";
+import { requireStaff } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { createWalkInSale } from "../actions";
 import AdminNav from "@/components/AdminNav";
@@ -11,7 +11,7 @@ import { ItemStatus, Role } from "@/lib/enums";
  * scaffolding note on the US Bank integration itself.
  */
 export default async function NewWalkInSalePage() {
-  await requireAdmin();
+  await requireStaff();
 
   const [items, clients] = await Promise.all([
     prisma.item.findMany({
