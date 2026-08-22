@@ -36,6 +36,15 @@ model User {
   active       Boolean  @default(true)
   phone        String?
   notifyNewItems Boolean @default(false)
+  /// Staff-only alert preferences: whether this Admin/Sales account gets
+  /// notified (email and/or SMS) when a client books an appointment,
+  /// submits something to sell, or completes a purchase. See
+  /// src/lib/staffAlerts.ts. Meaningless for CLIENT accounts. SMS requires
+  /// `phone` to be set in addition to staffNotifySms — see admin/staff.
+  /// Email defaults on since it costs nothing extra to enable; SMS defaults
+  /// off since it requires a phone number and a configured SMS provider.
+  staffNotifyEmail Boolean @default(true)
+  staffNotifySms   Boolean @default(false)
   createdAt    DateTime @default(now())
 
   submissions          SellSubmission[]
