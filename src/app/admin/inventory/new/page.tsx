@@ -1,11 +1,13 @@
-import { requireAdmin } from "@/lib/session";
+import { requireStaff } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { createItem } from "../actions";
 import PhotoUpload from "@/components/PhotoUpload";
 import AdminNav from "@/components/AdminNav";
+import { canSeeCost } from "@/lib/permissions";
 
 export default async function NewItemPage() {
-  await requireAdmin();
+  const user = await requireStaff();
+  const showCost = canSeeCost(user.role);
 
   const vendors = await prisma.vendor.findMany({ orderBy: { name: "asc" } });
 
@@ -42,16 +44,23 @@ export default async function NewItemPage() {
           <textarea className="input min-h-24" id="description" name="description" required />
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div>
-            <label className="label" htmlFor="costPrice">Cost price ($)</label>
-            <input className="input" id="costPrice" name="costPrice" type="number" min="0" step="0.01" required />
-          </div>
+        <div className={`grid gap-4 ${showCost ? "sm:grid-cols-2" : "sm:grid-cols-1"}`}>
+          {showCost && (
+            <div>
+              <label className="label" htmlFor="costPrice">Cost price ($)</label>
+              <input className="input" id="costPrice" name="costPrice" type="number" min="0" step="0.01" required />
+            </div>
+          )}
           <div>
             <label className="label" htmlFor="listPrice">List price ($)</label>
             <input className="input" id="listPrice" name="listPrice" type="number" min="0" step="0.01" required />
           </div>
         </div>
+        {!showCost && (
+          <p className="text-xs text-ink-500">
+            Cost price isn&apos;t shown here — an Admin can set it from this item&apos;s edit page after it&apos;s created.
+          </p>
+        )}
 
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
