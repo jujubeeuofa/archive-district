@@ -50,13 +50,22 @@ export default async function AdminStaffPage() {
               </select>
             </div>
           </div>
+          <div>
+            <label className="label" htmlFor="phone">Phone (optional)</label>
+            <input className="input" id="phone" name="phone" type="tel" placeholder="For SMS alerts — they can add this later too" />
+          </div>
           <button type="submit" className="btn-primary w-full">
             Create staff account
           </button>
         </form>
       </div>
 
-      <div className="mt-6 overflow-x-auto rounded-xl border border-ink-700">
+      <p className="mt-6 text-sm text-ink-400">
+        Each staff member controls their own alert preferences (email/SMS for new bookings, sell
+        submissions, and purchases) from the <span className="text-bone">Dashboard</span> tab.
+      </p>
+
+      <div className="mt-4 overflow-x-auto rounded-xl border border-ink-700">
         <table className="w-full text-sm">
           <thead className="bg-ink-800 text-left text-xs uppercase text-ink-400">
             <tr>
