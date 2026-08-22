@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getSession } from "@/lib/session";
+import { isStaff } from "@/lib/permissions";
 import SignOutButton from "@/components/SignOutButton";
 
 export default async function Navbar() {
@@ -19,8 +20,11 @@ export default async function Navbar() {
           <Link href="/sell" className="hover:text-bone">
             Sell to Us
           </Link>
+          <Link href="/book" className="hover:text-bone">
+            Book a Visit
+          </Link>
 
-          {session?.user?.role === "ADMIN" && (
+          {session?.user && isStaff(session.user.role) && (
             <Link href="/admin" className="hover:text-bone">
               Admin
             </Link>
