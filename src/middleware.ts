@@ -23,7 +23,7 @@ export default async function middleware(req: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  if (pathname.startsWith("/admin") && token.role !== "ADMIN") {
+  if (pathname.startsWith("/admin") && token.role !== "ADMIN" && token.role !== "SALES") {
     return NextResponse.redirect(new URL("/account", req.url));
   }
 
@@ -31,5 +31,5 @@ export default async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/admin/:path*", "/account/:path*", "/sell/:path*"],
+  matcher: ["/admin/:path*", "/account/:path*", "/sell/:path*", "/book/:path*"],
 };
