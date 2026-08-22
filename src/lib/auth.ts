@@ -33,6 +33,10 @@ export const authOptions: AuthOptions = {
         });
         if (!user) return null;
 
+        // Deactivated staff accounts (see /admin/staff) can't sign in at
+        // all — their history stays intact, they just lose access.
+        if (!user.active) return null;
+
         const valid = await bcrypt.compare(credentials.password, user.passwordHash);
         if (!valid) return null;
 

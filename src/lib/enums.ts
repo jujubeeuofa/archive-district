@@ -2,8 +2,22 @@
 // as String. These TS unions + const objects are the source of truth for
 // valid values everywhere in the app (forms, server actions, seed data).
 
-export const Role = { ADMIN: "ADMIN", CLIENT: "CLIENT" } as const;
+/// ADMIN and SALES are staff (can sign into /admin); CLIENT is a storefront
+/// customer account. See src/lib/permissions.ts for what each staff role can
+/// actually do.
+export const Role = { ADMIN: "ADMIN", SALES: "SALES", CLIENT: "CLIENT" } as const;
 export type Role = (typeof Role)[keyof typeof Role];
+
+export const AppointmentStatus = {
+  CONFIRMED: "CONFIRMED",
+  CANCELED: "CANCELED",
+  COMPLETED: "COMPLETED",
+  NO_SHOW: "NO_SHOW",
+} as const;
+export type AppointmentStatus = (typeof AppointmentStatus)[keyof typeof AppointmentStatus];
+
+/** Sun–Sat labels indexed by JS Date.getDay() (0=Sunday). */
+export const WEEKDAY_LABELS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"] as const;
 
 export const ItemStatus = {
   IN_STOCK: "IN_STOCK",

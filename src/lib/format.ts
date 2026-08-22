@@ -28,6 +28,8 @@ export function statusBadgeClass(status: string): string {
     case "ACCEPTED":
     case "AUTHENTICATED":
     case "SIGNED":
+    case "CONFIRMED":
+    case "COMPLETED":
       return "bg-emerald-900/40 text-emerald-300 border-emerald-700";
     case "SOLD":
       return "bg-accent/20 text-accent-light border-accent-dark";
@@ -46,6 +48,7 @@ export function statusBadgeClass(status: string): string {
     case "REFUNDED":
     case "FLAGGED":
     case "VOIDED":
+    case "NO_SHOW":
       return "bg-red-900/40 text-red-300 border-red-700";
     default:
       return "bg-ink-700 text-ink-300 border-ink-600";
