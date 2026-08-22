@@ -2,11 +2,12 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireAdmin } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
-import { updateItem, deleteItemPhoto, deleteItem, saveItemAuthenticityCheck } from "../actions";
+import { updateItem, deleteItemPhoto, deleteItem, saveItemAuthenticityCheck, findVisualMatchesForItem } from "../actions";
 import { createConsignmentAgreement } from "../../consignments/actions";
 import PhotoUpload from "@/components/PhotoUpload";
 import AdminNav from "@/components/AdminNav";
 import AuthenticityChecklist from "@/components/AuthenticityChecklist";
+import VisualMatchFinder from "@/components/VisualMatchFinder";
 import { computeMargin, formatMoney, statusBadgeClass } from "@/lib/format";
 import { stockXSearchUrl, grailedSearchUrl } from "@/lib/priceComp";
 import { getChecklistTemplate, getReferenceGuides } from "@/lib/authenticity";
@@ -247,6 +248,7 @@ export default async function AdminItemDetailPage({ params }: { params: { id: st
               Opens a search on each marketplace — not an automated price feed.
             </p>
           </div>
+          <VisualMatchFinder itemId={item.id} action={findVisualMatchesForItem} />
 
           <AuthenticityChecklist
             brand={item.brand}
@@ -355,8 +357,7 @@ export default async function AdminItemDetailPage({ params }: { params: { id: st
                   </button>
                 </form>
               </details>
-            )}
-          </div>
+</div>
         </div>
       </div>
     </div>

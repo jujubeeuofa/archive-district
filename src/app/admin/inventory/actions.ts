@@ -7,6 +7,7 @@ import { requireAdmin } from "@/lib/session";
 import { AuthenticityStatus, ItemSource, ItemStatus } from "@/lib/enums";
 import { parseChecklistFromFormData } from "@/lib/authenticity";
 import { notifyNewItemSubscribers } from "@/lib/notifications";
+import { findVisualMatches, visionConfigured, type VisualMatch } from "@/lib/visionMatch";
 
 function num(formData: FormData, key: string): number {
   const v = Number(formData.get(key));
@@ -133,6 +134,45 @@ export async function saveItemAuthenticityCheck(itemId: string, formData: FormDa
   revalidatePath("/shop");
   revalidatePath(`/shop/${itemId}`);
   revalidatePath("/admin");
+}
+
+export type VisualMatchResponse =
+  | { ok: true; matches: VisualMatch[]; bestGuess: string | null }
+  | { ok: false; error: string };
+
+/**
+ * Runs a Google Vision Web Detection lookup against the item's first photo
+ * and returns pages with a visually matching image — a Lens-style
+ * complement to the plain-text StockX/Grailed search links in priceComp.ts.
+ * Returns a typed ok/error result (rather than throwing) since this is
+ * called directly from a client component, not via a <form action>.
+ */
+export async function findVisualMatchesForItem(itemId: string): Promise<VisualMatchResponse> {
+  await requireAdmin();
+
+  if (!visionConfigured()) {
+    return {
+      ok: false,
+      error: "Visual match search isn't set up yet — add GOOGLE_VISION_API_KEY to enable it.",
+    };
+  }
+
+  const item = await prisma.item.findUnique({
+    where: { id: itemId },
+    include: { photos: { orderBy: { createdAt: "asc" }, take: 1 } },
+  });
+  if (!item) return { ok: false, error: "Item not found." };
+  if (item.photos.length === 0) {
+    return { ok: false, error: "This item needs at least one photo before it can be visually matched." };
+  }
+
+  try {
+    const { matches, bestGuess } = await findVisualMatches(item.photos[0].dataUrl);
+    return { ok: true, matches, bestGuess };
+  } catch (err) {
+    console.error("Visual match lookup failed:", err);
+    return { ok: false, error: "Visual match lookup failed — try again in a moment." };
+  }
 }
 
 export async function deleteItemPhoto(itemId: string, photoId: string) {

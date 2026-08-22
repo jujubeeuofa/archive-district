@@ -109,6 +109,7 @@ See `.env.example` for the full list with inline comments. Summary:
 | `STRIPE_PUBLISHABLE_KEY` | No | Only needed if you later add Stripe.js client-side elements; unused server-side |
 | `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` | No | Push subscribe button and admin "send test push" show a clear error instead of crashing |
 | `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | No | Must mirror `VAPID_PUBLIC_KEY` — this is the client-exposed copy used by the browser's `PushManager` |
+| `GOOGLE_VISION_API_KEY` | No | The "Find visual matches" button on an item's admin page shows a clear message instead of erroring |
 
 ### Demo checkout fallback (Stripe)
 
@@ -151,7 +152,30 @@ dev server. Then:
   a real push via `web-push` + your VAPID keys.
 
 Without the keys set, both flows show a clear inline error instead of
+
 throwing — nothing crashes.
+
+### Visual match search (Google Cloud Vision)
+
+This is a Google Lens-style companion to the plain-text StockX/Grailed
+search links (`src/lib/priceComp.ts`) — it doesn't scrape either
+marketplace, it calls Google's own paid Vision API and surfaces whichever
+public pages come back:
+
+1. Create a project in the [Google Cloud Console](https://console.cloud.google.com/),
+   enable **billing** and the **Cloud Vision API**.
+2. Create an API key (APIs & Services → Credentials) and restrict it to the
+   Vision API only.
+3. Set `GOOGLE_VISION_API_KEY` in `.env` and restart the dev server.
+
+On an item's admin detail page, the **Find visual matches** button (next to
+the existing StockX/Grailed links) sends the item's first photo to Vision's
+Web Detection feature and lists back pages with a visually matching image —
+StockX/Grailed hits sorted first, everything else after. This is billed per
+lookup by Google (Web Detection is roughly $1.50 per 1,000 images at time
+of writing) — unlike the free text-search links, so it's opt-in and off by
+default. Without the key set, the button shows a clear message instead of
+erroring.
 
 ## Photo uploads (prototype storage choice)
 
