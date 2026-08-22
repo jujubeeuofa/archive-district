@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { requireAdmin } from "@/lib/session";
+import { requireStaff } from "@/lib/session";
 import {
   AuthenticityStatus,
   ItemSource,
@@ -15,7 +15,7 @@ import {
 import { parseChecklistFromFormData } from "@/lib/authenticity";
 
 export async function updateSubmissionStatus(submissionId: string, formData: FormData) {
-  await requireAdmin();
+  await requireStaff();
   const status = String(formData.get("status") || "") as SubmissionStatus;
   await prisma.sellSubmission.update({ where: { id: submissionId }, data: { status } });
   revalidatePath(`/admin/submissions/${submissionId}`);
@@ -23,7 +23,7 @@ export async function updateSubmissionStatus(submissionId: string, formData: For
 }
 
 export async function makeOffer(submissionId: string, formData: FormData) {
-  await requireAdmin();
+  await requireStaff();
   const offerAmount = Number(formData.get("offerAmount"));
   if (!Number.isFinite(offerAmount) || offerAmount <= 0) return;
   const payoutType = String(formData.get("payoutType") || SubmissionPayoutType.CASH) as SubmissionPayoutType;
@@ -44,7 +44,7 @@ export async function makeOffer(submissionId: string, formData: FormData) {
  * audit trail (who reviewed what, and when) isn't lost.
  */
 export async function saveSubmissionAuthenticityCheck(submissionId: string, formData: FormData) {
-  const admin = await requireAdmin();
+  const admin = await requireStaff();
 
   const submission = await prisma.sellSubmission.findUnique({ where: { id: submissionId } });
   if (!submission) return;
@@ -86,7 +86,7 @@ export async function saveSubmissionAuthenticityCheck(submissionId: string, form
  * Unverified.
  */
 export async function convertToInventory(submissionId: string) {
-  const admin = await requireAdmin();
+  const admin = await requireStaff();
 
   const submission = await prisma.sellSubmission.findUnique({
     where: { id: submissionId },
