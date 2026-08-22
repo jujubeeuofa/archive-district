@@ -3,7 +3,8 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/session";
-import { getAppointmentSettings, bookAppointment, sendAppointmentConfirmationEmail } from "@/lib/appointments";
+import { getAppointmentSettings, bookAppointment, sendAppointmentConfirmationEmail, formatApptDateTime } from "@/lib/appointments";
+import { notifyStaffOfBooking } from "@/lib/staffAlerts";
 import { prisma } from "@/lib/prisma";
 import { AppointmentStatus } from "@/lib/enums";
 
@@ -25,6 +26,9 @@ export async function createAppointment(formData: FormData) {
   if (profile) {
     await sendAppointmentConfirmationEmail(profile, appointment).catch((err) => {
       console.error("Failed to send appointment confirmation email:", err);
+    });
+    await notifyStaffOfBooking(profile, formatApptDateTime(appointment.startAt)).catch((err) => {
+      console.error("Failed to notify staff of new booking:", err);
     });
   }
 
