@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { requireAdmin } from "@/lib/session";
+import { requireStaff } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { updateItem, deleteItemPhoto, deleteItem, saveItemAuthenticityCheck, findVisualMatchesForItem } from "../actions";
 import { createConsignmentAgreement } from "../../consignments/actions";
@@ -12,10 +12,13 @@ import { computeMargin, formatMoney, statusBadgeClass } from "@/lib/format";
 import { stockXSearchUrl, grailedSearchUrl } from "@/lib/priceComp";
 import { getChecklistTemplate, getReferenceGuides } from "@/lib/authenticity";
 import { buildDefaultConsignmentContract } from "@/lib/consignment";
+import { canDelete, canSeeCost } from "@/lib/permissions";
 import type { ChecklistEntry } from "@/lib/enums";
 
 export default async function AdminItemDetailPage({ params }: { params: { id: string } }) {
-  await requireAdmin();
+  const user = await requireStaff();
+  const showCost = canSeeCost(user.role);
+  const showDelete = canDelete(user.role);
 
   const item = await prisma.item.findUnique({
     where: { id: params.id },
@@ -60,11 +63,13 @@ export default async function AdminItemDetailPage({ params }: { params: { id: st
           <h1 className="text-2xl font-display uppercase text-bone">{item.title}</h1>
           <p className="text-sm text-ink-400">{item.brand} · {item.category}</p>
         </div>
-        <form action={boundDelete}>
-          <button type="submit" className="btn-danger">
-            Delete item
-          </button>
-        </form>
+        {showDelete && (
+          <form action={boundDelete}>
+            <button type="submit" className="btn-danger">
+              Delete item
+            </button>
+          </form>
+        )}
       </div>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-3">
@@ -103,19 +108,21 @@ export default async function AdminItemDetailPage({ params }: { params: { id: st
               />
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-3">
-              <div>
-                <label className="label" htmlFor="costPrice">Cost price ($)</label>
-                <input
-                  className="input"
-                  id="costPrice"
-                  name="costPrice"
-                  type="number"
-                  step="0.01"
-                  defaultValue={item.costPrice}
-                  required
-                />
-              </div>
+            <div className={`grid gap-4 ${showCost ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
+              {showCost && (
+                <div>
+                  <label className="label" htmlFor="costPrice">Cost price ($)</label>
+                  <input
+                    className="input"
+                    id="costPrice"
+                    name="costPrice"
+                    type="number"
+                    step="0.01"
+                    defaultValue={item.costPrice}
+                    required
+                  />
+                </div>
+              )}
               <div>
                 <label className="label" htmlFor="listPrice">List price ($)</label>
                 <input
@@ -198,14 +205,16 @@ export default async function AdminItemDetailPage({ params }: { params: { id: st
                 <div key={p.id} className="group relative aspect-square overflow-hidden rounded-lg border border-ink-700">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={p.dataUrl} alt="" className="h-full w-full object-cover" />
-                  <form action={deleteItemPhoto.bind(null, item.id, p.id)}>
-                    <button
-                      type="submit"
-                      className="absolute right-1 top-1 rounded-full bg-black/70 px-1.5 py-0.5 text-xs text-bone opacity-0 transition-opacity group-hover:opacity-100"
-                    >
-                      ✕
-                    </button>
-                  </form>
+                  {showDelete && (
+                    <form action={deleteItemPhoto.bind(null, item.id, p.id)}>
+                      <button
+                        type="submit"
+                        className="absolute right-1 top-1 rounded-full bg-black/70 px-1.5 py-0.5 text-xs text-bone opacity-0 transition-opacity group-hover:opacity-100"
+                      >
+                        ✕
+                      </button>
+                    </form>
+                  )}
                 </div>
               ))}
             </div>
@@ -213,16 +222,18 @@ export default async function AdminItemDetailPage({ params }: { params: { id: st
         </div>
 
         <div className="space-y-4">
-          <div className="card p-5">
-            <p className="label">Computed margin</p>
-            <p className={`mt-1 text-2xl font-semibold ${margin >= 0 ? "text-emerald-400" : "text-red-400"}`}>
-              {formatMoney(margin)}
-            </p>
-            <p className="text-xs text-ink-400">{marginPct.toFixed(1)}% over cost</p>
-            <p className="mt-3 text-xs text-ink-500">
-              Based on {item.soldPrice != null ? "sold price" : "list price"} minus cost. Not stored — computed on the fly.
-            </p>
-          </div>
+          {showCost && (
+            <div className="card p-5">
+              <p className="label">Computed margin</p>
+              <p className={`mt-1 text-2xl font-semibold ${margin >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                {formatMoney(margin)}
+              </p>
+              <p className="text-xs text-ink-400">{marginPct.toFixed(1)}% over cost</p>
+              <p className="mt-3 text-xs text-ink-500">
+                Based on {item.soldPrice != null ? "sold price" : "list price"} minus cost. Not stored — computed on the fly.
+              </p>
+            </div>
+          )}
 
           <div className="card p-5">
             <p className="label mb-2">Price comparison</p>
