@@ -1,9 +1,9 @@
-import { requireAdmin } from "@/lib/session";
+import { requireStaff } from "@/lib/session";
 import { createVendor } from "../actions";
 import AdminNav from "@/components/AdminNav";
 
 export default async function NewVendorPage() {
-  await requireAdmin();
+  await requireStaff();
 
   return (
     <div>
