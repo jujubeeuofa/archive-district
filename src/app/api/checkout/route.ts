@@ -3,6 +3,7 @@ import { getSession } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { ItemStatus, OrderStatus, TenderType } from "@/lib/enums";
 import { getStripe, stripeConfigured } from "@/lib/stripe";
+import { usBankOnlineProvider } from "@/lib/payments/usBankOnline";
 import { getCreditBalance } from "@/lib/credit";
 import { markOrderPaidAndFulfill } from "@/lib/orderFulfillment";
 
@@ -13,14 +14,16 @@ import { markOrderPaidAndFulfill } from "@/lib/orderFulfillment";
  * up to the buyer's available trade-in credit toward it (clamped server-side
  * — never trust the client's number), then:
  *  - If the credit applied covers the full price, there's nothing left to
- *    charge: skip Stripe entirely and mark the order paid immediately via
- *    markOrderPaidAndFulfill (which also redeems the credit).
- *  - Else if STRIPE_SECRET_KEY is set, creates a real Stripe Checkout
- *    Session for the remaining balance and returns its URL for redirect.
- *  - Else, this is the DEMO FALLBACK: the order is marked PAID immediately
- *    (no Stripe call) for the remaining balance, so the full purchase flow
- *    works with zero external setup. See README for how to switch to live
- *    Stripe.
+ *    charge: skip the payment provider entirely and mark the order paid
+ *    immediately via markOrderPaidAndFulfill (which also redeems the credit).
+ *  - Otherwise, hands off to whichever online payment provider is selected
+ *    by PAYMENT_PROVIDER ("stripe", the default, or "us_bank" — see
+ *    src/lib/payments/usBankOnline.ts for that one's current scaffold-only
+ *    status). Each provider falls back to the same DEMO FALLBACK behavior
+ *    when it isn't configured: the order is marked PAID immediately (no real
+ *    charge) for the remaining balance, so the full purchase flow works with
+ *    zero external setup. See README / .env.example for how to go live with
+ *    either provider.
  */
 export async function POST(req: NextRequest) {
   const session = await getSession();
@@ -44,6 +47,10 @@ export async function POST(req: NextRequest) {
   const creditApplied = Math.max(0, Math.min(requestedCredit, balance, item.listPrice));
   const total = Math.round((item.listPrice - creditApplied) * 100) / 100;
 
+  // "stripe" (default) or "us_bank" — see src/lib/payments/usBankOnline.ts.
+  const paymentProvider = (process.env.PAYMENT_PROVIDER || "stripe").toLowerCase();
+  const origin = req.headers.get("origin") || process.env.NEXTAUTH_URL || "http://localhost:3000";
+
   const order = await prisma.order.create({
     data: {
       buyerId: session.user.id,
@@ -51,7 +58,7 @@ export async function POST(req: NextRequest) {
       subtotal: item.listPrice,
       total,
       creditApplied,
-      tenderType: TenderType.CARD,
+      tenderType: paymentProvider === "us_bank" ? TenderType.US_BANK : TenderType.CARD,
       items: { create: [{ itemId: item.id, priceAtSale: item.listPrice }] },
     },
   });
@@ -60,6 +67,38 @@ export async function POST(req: NextRequest) {
     // Fully covered by trade-in credit — nothing to charge.
     await markOrderPaidAndFulfill(order.id);
     return NextResponse.json({ url: `/account/orders/${order.id}?demo=1`, demo: true });
+  }
+
+  if (paymentProvider === "us_bank") {
+    const result = usBankOnlineProvider.isConfigured()
+      ? await usBankOnlineProvider.createCheckoutSession({
+          orderId: order.id,
+          amount: total,
+          description: `${item.brand} — ${item.title}`,
+          successUrl: `${origin}/account/orders/${order.id}?success=1`,
+          cancelUrl: `${origin}/shop/${item.id}?canceled=1`,
+        })
+      : null;
+
+    if (result) {
+      await prisma.order.update({
+        where: { id: order.id },
+        data: { stripeSessionId: result.providerRef },
+      });
+      return NextResponse.json({ url: result.redirectUrl });
+    }
+
+    // --- DEMO FALLBACK: US Bank provider not configured/implemented yet. ---
+    await prisma.order.update({
+      where: { id: order.id },
+      data: { stripeSessionId: `demo_${order.id}` },
+    });
+    await markOrderPaidAndFulfill(order.id);
+
+    return NextResponse.json({
+      url: `/account/orders/${order.id}?demo=1`,
+      demo: true,
+    });
   }
 
   if (!stripeConfigured()) {
@@ -78,7 +117,6 @@ export async function POST(req: NextRequest) {
 
   try {
     const stripe = getStripe();
-    const origin = req.headers.get("origin") || process.env.NEXTAUTH_URL || "http://localhost:3000";
 
     const checkoutSession = await stripe.checkout.sessions.create({
       mode: "payment",
