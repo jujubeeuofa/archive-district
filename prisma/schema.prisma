@@ -176,6 +176,11 @@ model Order {
   total           Float
     /// TenderType: "CARD" | "CASH" | "US_BANK" | "OTHER"
   tenderType      String   @default("CARD")
+  /// Despite the name (kept as-is to avoid a migration), this holds whichever
+  /// online payment provider's session/transaction reference applies —
+  /// a real Stripe Checkout Session id, `demo_<orderId>` for demo-checkout,
+  /// or (once implemented) a future US Bank provider's reference. See
+  /// src/lib/payments/usBankOnline.ts and PAYMENT_PROVIDER in .env.example.
   stripeSessionId String?
   /// Trade-in credit applied to this order at checkout (dollars). subtotal
   /// minus creditApplied is what was actually charged (total). 0 if none
