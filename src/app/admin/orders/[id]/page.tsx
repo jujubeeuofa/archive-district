@@ -77,7 +77,7 @@ export default async function AdminOrderDetailPage({ params }: { params: { id: s
             <p className="text-sm text-bone">{order.tenderType}</p>
             {order.stripeSessionId && (
               <p className="mt-1 break-all text-xs text-ink-500">
-                Stripe session: {order.stripeSessionId}
+                Payment reference: {order.stripeSessionId}
               </p>
             )}
           </div>
